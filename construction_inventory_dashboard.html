@@ -396,20 +396,18 @@
         async function handleTransactionSubmit(e) {
             e.preventDefault();
             
-            // เปลี่ยนปุ่มเป็นสถานะกำลังโหลด
             const submitBtn = document.getElementById("submitBtn");
             const originalBtnText = submitBtn.innerText;
             submitBtn.innerText = "กำลังบันทึก...";
             submitBtn.disabled = true;
 
-            const type = document.getElementById("transType").value.toUpperCase(); // 'IN' or 'OUT'
+            const type = document.getElementById("transType").value.toUpperCase(); 
             const itemId = document.getElementById("transItem").value;
             const qty = parseFloat(document.getElementById("transQty").value);
             
-            // ดึงข้อมูลฟิลด์อื่นๆ ที่เพิ่มเข้ามาตาม Database Schema
             const docRef = document.getElementById("transDoc").value || "N/A";
             const person = document.getElementById("transPerson").value || "N/A";
-            const note = document.getElementById("transNote").value || "";
+            const note = document.getElementById("transNote").value || "-";
             
             const item = inventoryData.find(i => i.id === itemId);
             
@@ -420,35 +418,37 @@
                 return;
             }
 
-            // เตรียม Data ส่งไปที่ API
-            const payload = {
+            // เตรียมพารามิเตอร์ส่งไปแบบ GET Request
+            const params = new URLSearchParams({
+                action: 'transaction',
                 type: type,
                 itemId: itemId,
                 qty: qty,
                 doc: docRef,
                 person: person,
-                projectLoc: item.location, // ทำรายการตัดสต็อกที่ Location ของสินค้านั้น
-                note: note
-            };
+                projectLoc: item.location,
+                note: note,
+                t: new Date().getTime() // ป้องกันเบราว์เซอร์จำข้อมูลเก่า
+            });
+
+            // สร้าง URL แบบเต็ม
+            const targetUrl = WEB_APP_URL + "?" + params.toString();
 
             try {
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(payload) // ส่งเป็น String แบบ 'text/plain' เพื่อเลี่ยง CORS preflight ในบางกรณี
-                });
-                
+                // ใช้ GET ปกติทะลวง CORS 100%
+                const response = await fetch(targetUrl);
                 const result = await response.json();
                 
                 if (result.status === 'success') {
                     showToast(`${type === 'OUT' ? 'เบิก' : 'รับเข้า'} ${item.name} จำนวน ${qty} ${item.unit} เรียบร้อยแล้ว`);
                     closeTransactionModal();
-                    fetchDataFromAPI(); // โหลดข้อมูลใหม่เพื่อรีเฟรชตาราง
+                    fetchDataFromAPI(); // รีโหลดข้อมูลใหม่ทันที
                 } else {
-                    alert("Error: " + result.message);
+                    alert("Error จากระบบ: " + result.message);
                 }
             } catch (error) {
                 console.error("Submit Error:", error);
-                alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ (Network/CORS)");
             } finally {
                 submitBtn.innerText = originalBtnText;
                 submitBtn.disabled = false;
