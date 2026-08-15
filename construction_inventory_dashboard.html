@@ -33,6 +33,7 @@
         }
     </style>
 </head>
+<script src="config.js"></script>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col md:flex-row">
 
     <!-- Sidebar Navigation -->
@@ -104,9 +105,10 @@
                 <div class="relative flex-1 sm:flex-none">
                     <select id="projectFilter" onchange="filterProjectData()" class="w-full bg-slate-100 border border-slate-300 text-slate-700 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-2.5 pr-8 appearance-none font-medium cursor-pointer">
                         <option value="all">ทุกโครงการ (รวมทั้งหมด)</option>
-                        <option value="p1">โครงการ A: คอนโดมิเนียม สุขุมวิท</option>
-                        <option value="p2">โครงการ B: อาคารสำนักงาน พระราม 9</option>
-                        <option value="p3">โครงการ C: หมู่บ้านจัดสรร ราชพฤกษ์</option>
+                        <option value="สโตร์กลาง">สโตร์กลาง</option>
+                        <option value="ทวีวงษ์ New factory">ทวีวงษ์ New factory</option>
+                        <option value="บุญพา">บุญพา</option>
+                        <option value="KVG อาคารเก็บสินค้า">KVG อาคารเก็บสินค้า</option>
                     </select>
                     <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-2.5 top-3.5 pointer-events-none"></i>
                 </div>
@@ -345,30 +347,114 @@
 
     <!-- JavaScript Logic -->
     <script>
-        // Mock Data for Inventory Items
-        let inventoryData = [
-            { id: "MAT-001", name: "ปูนซีเมนต์ปอร์ตแลนด์ (ตราช้าง)", category: "โครงสร้าง", qty: 120, min: 200, unit: "ถุง", location: "โกดัง A-1", project: "p1" },
-            { id: "MAT-002", name: "เหล็กเส้นข้ออ้อย DB16 มม.", category: "โครงสร้าง", qty: 15, min: 10, unit: "ตัน", location: "ลานเหล็ก B", project: "p1" },
-            { id: "MAT-003", name: "อิฐมวลเบา 7.5 ซม.", category: "สถาปัตยกรรม", qty: 3500, min: 1000, unit: "ก้อน", location: "โกดัง C-2", project: "p2" },
-            { id: "MAT-004", name: "สายไฟฟ้า THW 1x2.5 ตร.มม.", category: "งานระบบ", qty: 8, min: 15, unit: "ม้วน", location: "ห้องสโตร์ E", project: "p2" },
-            { id: "MAT-005", name: "ท่อ PVC ตราช้าง 3/4 นิ้ว (ชั้น 8.5)", category: "งานระบบ", qty: 120, min: 50, unit: "เส้น", location: "โกดัง B-3", project: "p3" },
-            { id: "MAT-006", name: "สีรองพื้นปูนเก่า TOA Quick Primer", category: "สถาปัตยกรรม", qty: 5, min: 12, unit: "ถัง", location: "ห้องเคมี D", project: "p1" },
-            { id: "MAT-007", name: "นั่งร้านเหล็กมาตรฐาน 1.7 ม.", category: "เครื่องมือ", qty: 85, min: 30, unit: "ชุด", location: "ลานอุปกรณ์ C", project: "p3" },
-            { id: "MAT-008", name: "แผ่นยิปซัมบอร์ด 12 มม.", category: "สถาปัตยกรรม", qty: 40, min: 100, unit: "แผ่น", location: "โกดัง A-3", project: "p2" },
-            { id: "MAT-009", name: "ลวดผูกเหล็ก เบอร์ 18", category: "โครงสร้าง", qty: 180, min: 50, unit: "กก.", location: "ห้องสโตร์ E", project: "p1" },
-            { id: "MAT-010", name: "สว่านกระแทกไร้สาย 18V", category: "เครื่องมือ", qty: 12, min: 5, unit: "เครื่อง", location: "ห้องเครื่องมือ M", project: "p3" }
-        ];
+        
+        const WEB_APP_URL = "WEB_APP_URL";
 
+        let inventoryData = [];
         let usageChartInstance = null;
         let categoryChartInstance = null;
 
         // Initialize App on DOM Load
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
-            renderInventoryTable();
             initCharts();
-            updateKPIs();
+            fetchDataFromAPI(); // เรียกใช้ฟังก์ชันดึงข้อมูลจาก Google Sheets
         });
+
+        // ฟังก์ชันดึงข้อมูล (GET)
+        async function fetchDataFromAPI() {
+            const tableBody = document.getElementById("inventoryTableBody");
+            tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500"><div class="flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> กำลังโหลดข้อมูล...</div></td></tr>`;
+            lucide.createIcons();
+
+            try {
+                const response = await fetch(WEB_APP_URL);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // แปลงชื่อ Field ให้ตรงกับที่ UI เรียกใช้
+                    inventoryData = result.data.map(item => ({
+                        id: item.Material_ID,
+                        name: item.Material_Name,
+                        category: item.Category,
+                        qty: parseFloat(item.Current_Qty) || 0,
+                        min: parseFloat(item.Safety_Stock) || 0,
+                        unit: item.Unit,
+                        location: item.Location_Project,
+                        project: item.Location_Project 
+                    }));
+                    
+                    renderInventoryTable();
+                    updateKPIs();
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+            }
+        }
+
+        // === ฟังก์ชัน Submit สำหรับเบิก/รับของ (POST) ===
+        async function handleTransactionSubmit(e) {
+            e.preventDefault();
+            
+            // เปลี่ยนปุ่มเป็นสถานะกำลังโหลด
+            const submitBtn = document.getElementById("submitBtn");
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.innerText = "กำลังบันทึก...";
+            submitBtn.disabled = true;
+
+            const type = document.getElementById("transType").value.toUpperCase(); // 'IN' or 'OUT'
+            const itemId = document.getElementById("transItem").value;
+            const qty = parseFloat(document.getElementById("transQty").value);
+            
+            // ดึงข้อมูลฟิลด์อื่นๆ ที่เพิ่มเข้ามาตาม Database Schema
+            const docRef = document.getElementById("transDoc").value || "N/A";
+            const person = document.getElementById("transPerson").value || "N/A";
+            const note = document.getElementById("transNote").value || "";
+            
+            const item = inventoryData.find(i => i.id === itemId);
+            
+            if (type === 'OUT' && item.qty < qty) {
+                alert("จำนวนสินค้าคงเหลือไม่พอสำหรับการเบิกจ่าย!");
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+                return;
+            }
+
+            // เตรียม Data ส่งไปที่ API
+            const payload = {
+                type: type,
+                itemId: itemId,
+                qty: qty,
+                doc: docRef,
+                person: person,
+                projectLoc: item.location, // ทำรายการตัดสต็อกที่ Location ของสินค้านั้น
+                note: note
+            };
+
+            try {
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload) // ส่งเป็น String แบบ 'text/plain' เพื่อเลี่ยง CORS preflight ในบางกรณี
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showToast(`${type === 'OUT' ? 'เบิก' : 'รับเข้า'} ${item.name} จำนวน ${qty} ${item.unit} เรียบร้อยแล้ว`);
+                    closeTransactionModal();
+                    fetchDataFromAPI(); // โหลดข้อมูลใหม่เพื่อรีเฟรชตาราง
+                } else {
+                    alert("Error: " + result.message);
+                }
+            } catch (error) {
+                console.error("Submit Error:", error);
+                alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            } finally {
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        }
 
         // Filter Data by Selected Project
         function filterProjectData() {
