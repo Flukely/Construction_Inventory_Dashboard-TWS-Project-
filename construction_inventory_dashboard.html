@@ -479,7 +479,7 @@
 
     <!-- JavaScript Engine -->
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyXZ4u_GNJ_hO9VBuka4grZaAsK0OwPa159JPzwpqAPY2AQcyawc9opviEAEjUmCQ4PKw/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyzZhkmo8UHCofOs9H0IXhyXfhhKkCSeqJDbj6j1Sm3_9NokWla9AU5TNRztWTl4_5VFQ/exec"; 
 
         let currentDrilldownSite = "all";
         let inventoryData = [];
@@ -487,33 +487,12 @@
         let transactionsDatabase = [];
         let currentActiveView = 'dashboard'; 
 
-        // ท่าไม้ตาย JSONP ทะลวง CORS
-        function fetchJSONP(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                window[callbackName] = function(data) {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    resolve(data);
-                };
-                
-                const script = document.createElement('script');
-                script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
-                script.onerror = function() {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    reject(new Error("JSONP Request Failed"));
-                };
-                document.body.appendChild(script);
-            });
-        }
-
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
-            // อัปเดตจำนวนคงเหลือใน Modal ทันทีเมื่อเปลี่ยนรายการวัสดุหรือไซต์งาน [ข้อ 6]
+            // อัปเดตจำนวนคงเหลือใน Modal ทันทีเมื่อเปลี่ยนรายการวัสดุหรือไซต์งาน
             document.addEventListener('change', function(e) {
                 if (e.target && (e.target.id === 'modalItemSelect' || e.target.id === 'modalSiteSelect')) {
                     const selectedId = document.getElementById("modalItemSelect").value;
@@ -530,10 +509,10 @@
             });
         });
 
-        // โหลดข้อมูลหลัก (โดยไม่รีเซ็ตหน้าจอที่ผู้ใช้อยู่)
+        // 1. โหลดข้อมูลหลักแบบ Real-time
         async function fetchSheetData(isSilent = false) {
             if (!isSilent) {
-                const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังดึงข้อมูลแบบ Real-time...</p></td></tr>`;
+                const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูล...</p></td></tr>`;
                 ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody', 'projectDrilldownTableBody'].forEach(id => {
                     const el = document.getElementById(id); if(el) el.innerHTML = loaderHTML;
                 });
@@ -541,7 +520,9 @@
             }
 
             try {
-                const result = await fetchJSONP(WEB_APP_URL + "?action=load&t=" + new Date().getTime());
+                // ใช้ fetch ปกติ ทะลวงข้อมูล
+                const response = await fetch(WEB_APP_URL + "?action=load&t=" + new Date().getTime());
+                const result = await response.json();
                 
                 if (result.status === 'success') {
                     let rawSheetData = {};
@@ -571,12 +552,12 @@
                     document.getElementById('pendingSummaryBadge').innerText = pendingCount + " รายการ";
 
                     onDataLoaded(rawSheetData);
-                } else { console.error("Error: " + result.message); }
-            } catch (e) { console.error(e); }
+                }
+            } catch (e) { console.error("Load Data Error:", e); }
         }
 
-        // บันทึกรายการ (ขอเบิก / รับเข้า / ปรับปรุง) พร้อมหน่วงเวลารอฐานข้อมูล [ข้อ 3, 4, 5]
-        async function handleTransactionSubmit(e) {
+        // 2. บันทึกคำร้อง (แก้ปัญหาเว็บค้างและไม่อัปเดต)
+        function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerText;
@@ -601,43 +582,46 @@
                 t: new Date().getTime()
             });
 
-            try {
-                const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
-                if(result.status === 'success') {
-                    closeModal();
-                    showToast("บันทึกคำร้องสำเร็จ! กำลังซิงค์ข้อมูล...");
-                    
-                    // หน่วงเวลา 1.8 วินาทีเพื่อให้ Google Sheets บันทึกเสร็จสนิท
-                    setTimeout(async () => {
-                        await fetchSheetData(true); 
-                        switchView(currentActiveView); // คงอยู่ที่หน้าเดิม ไม่เด้งกลับหน้าแรก
-                    }, 1800);
-                } else { alert("Error: " + result.message); }
-            } catch (err) { alert("เชื่อมต่อล้มเหลว"); } 
-            finally { submitBtn.innerText = originalText; submitBtn.disabled = false; }
+            // ใช้ no-cors ยิงข้อมูลทิ้งไว้ ไม่ต้องรอ Google ตอบกลับให้เสียเวลา
+            fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
+                closeModal();
+                showToast("บันทึกคำร้องสำเร็จ! กำลังอัปเดตหน้าจอ...");
+                
+                // หน่วง 1.5 วินาทีให้ Google บันทึกเสร็จ แล้วโหลดข้อมูลใหม่เข้าสู่หน้าจอเดิมเงียบๆ
+                setTimeout(() => {
+                    fetchSheetData(true).then(() => {
+                        switchView(currentActiveView);
+                        submitBtn.innerText = originalText; 
+                        submitBtn.disabled = false;
+                    });
+                }, 1500);
+            }).catch(err => {
+                alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
+                submitBtn.innerText = originalText; 
+                submitBtn.disabled = false;
+            });
         }
 
-        // อนุมัติ / ปฏิเสธ พร้อมหน่วงเวลา [ข้อ 7]
-        async function approveTransaction(transId, isApprove) {
+        // 3. อนุมัติ / ปฏิเสธ (อัปเดตตารางทันที)
+        function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
             
-            try {
-                showToast("กำลังประมวลผล...");
-                const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
-                if(result.status === 'success') {
-                    showToast(result.message);
-                    
-                    // หน่วงเวลา 1.8 วินาทีให้ Google Sheets อัปเดตสต็อกเสร็จ
-                    setTimeout(async () => {
-                        await fetchSheetData(true); 
-                        switchView(currentActiveView); // คงอยู่ที่หน้าเดิม
-                    }, 1800);
-                } else { alert("Error: " + result.message); }
-            } catch (err) { alert("เชื่อมต่อล้มเหลว"); }
+            showToast("กำลังประมวลผลการอนุมัติ...");
+            
+            fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
+                setTimeout(() => {
+                    showToast("อัปเดตสถานะสำเร็จ!");
+                    fetchSheetData(true).then(() => {
+                        switchView(currentActiveView);
+                    });
+                }, 1500);
+            }).catch(err => { alert("เกิดข้อผิดพลาด"); });
         }
 
-        // จัดการเปลี่ยนหน้าจอ [ข้อ 1]
+        // =====================================
+        // ฟังก์ชันเปลี่ยนหน้าจอ (เก็บสถานะปุ่มและหน้าจอไว้)
+        // =====================================
         function switchView(viewName) { 
             currentActiveView = viewName; 
             ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
@@ -689,7 +673,6 @@
             }
         }
 
-        // หัวตารางรายการวัสดุอุปกรณ์ [ข้อ 2]
         function renderInventoryTable() {
             const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
             const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
