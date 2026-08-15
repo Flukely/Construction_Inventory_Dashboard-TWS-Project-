@@ -479,7 +479,7 @@
 
     <!-- JavaScript Engine -->
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwCn56d6ZmgWkPE1qWGoR7bz2l9QedqvdTL8RGt8WF7zEUzKng8EYroVU7nLQJ_YsH2SA/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxYbSTyzZKfYtywV5ZybSwiZjzr_9MSl_gJiLi9kVWKl7YF9vLrWyy5w2PELBjMX0aj7Q/exec"; 
 
         let currentDrilldownSite = "all";
         let inventoryData = [];
@@ -488,13 +488,12 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
-            fetchSheetData(); // โหลดข้อมูลจริงแทน Mock Data
+            fetchSheetData(); // โหลดข้อมูลจริง 100%
         });
 
-        // 1. ฟังก์ชันโหลดข้อมูลหลัก (ผ่าน Serverless GET)
-        // 1. ฟังก์ชันโหลดข้อมูลหลัก (ผ่าน Serverless GET)
+        // 1. ฟังก์ชันโหลดข้อมูลหลัก
         async function fetchSheetData() {
-            const loaderHTML = `<tr><td colspan="7" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูลแบบ Real-time...</p></td></tr>`;
+            const loaderHTML = `<tr><td colspan="7" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังดึงข้อมูลจากระบบ...</p></td></tr>`;
             ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody'].forEach(id => {
                 const el = document.getElementById(id);
                 if(el) el.innerHTML = loaderHTML;
@@ -503,27 +502,34 @@
 
             try {
                 const response = await fetch(WEB_APP_URL + "?t=" + new Date().getTime());
-                
-                // ดักจับ: ถ้า Google ส่งหน้าเว็บ HTML กลับมาแทนที่จะเป็นข้อมูล
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("text/html") !== -1) {
-                    console.error("Google ส่ง HTML กลับมา:", await response.text());
                     throw new Error("API_RETURNED_HTML");
                 }
 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
+                    // ประมวลผล Inventory จาก Sheets
                     let rawSheetData = {};
                     result.inventory.forEach(row => {
                         let code = String(row.Material_ID).trim();
                         if (!rawSheetData[code]) {
-                            rawSheetData[code] = { code: code, name: row.Material_Name, unit: row.Unit, stocks: {} };
+                            rawSheetData[code] = { 
+                                code: code, 
+                                name: row.Material_Name, 
+                                unit: row.Unit, 
+                                cat: row.Category,
+                                safe: parseFloat(row.Safety_Stock) || 0,
+                                price: parseFloat(row.Unit_Price) || 0,
+                                stocks: {} 
+                            };
                         }
                         rawSheetData[code].stocks[row.Location_Project] = parseFloat(row.Current_Qty) || 0;
                     });
                     
-                    transactionsDatabase = result.transactions.map(t => {
+                    // ประมวลผล Transactions (ประวัติทั้งหมด)
+                    transactionsDatabase = (result.transactions || []).map(t => {
                         let mode = "out";
                         if (t.Type === "IN") mode = "in";
                         else if (String(t.Type || "").includes("ADJ")) mode = "adj";
@@ -550,27 +556,17 @@
                     document.getElementById('pendingSummaryBadge').innerText = pendingCount + " รายการ";
 
                     onDataLoaded(rawSheetData);
-                } else {
-                    alert("Error จากระบบคลังสินค้า: " + result.message);
-                }
+                } else { alert("Error: " + result.message); }
             } catch (e) {
-                console.error("Fetch Error:", e);
-                // แจ้งเตือนให้ตรงจุด ไม่เหมารวมว่าเป็น CORS แล้ว
                 if (e.message === "API_RETURNED_HTML") {
-                    alert("⚠️ Google บล็อกการเชื่อมต่อ! (ส่งหน้า Login มาแทน)\n\nวิธีแก้:\n1. ตรวจสอบว่าตอน Deploy เลือก 'ทุกคน (Anyone)' หรือยัง\n2. ลองเปิดเว็บในหน้าต่างไม่ระบุตัวตน (Incognito) เพื่อหลีกเลี่ยงบั๊กอีเมลซ้อนกันของ Chrome");
+                    alert("⚠️ Google บล็อกการเชื่อมต่อ! กรุณาเช็กสิทธิ์ Everyone");
                 } else {
-                    alert("⚠️ เกิดข้อผิดพลาดในการประมวลผลข้อมูลโค้ด (เช็กรายละเอียดที่ Console F12)");
+                    alert("⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล");
                 }
-                
-                // คืนค่าตารางให้ว่างเปล่า ไม่ค้างที่ Loader
-                ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if(el) el.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-rose-500 font-bold">❌ โหลดข้อมูลล้มเหลว</td></tr>`;
-                });
             }
         }
 
-        // 2. ฟังก์ชัน Submit สำหรับขอทำรายการ (ส่งไป รออนุมัติ)
+        // 2. ฟังก์ชัน Submit
         async function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -580,15 +576,13 @@
 
             const currentMode = document.getElementById("formCurrentMode").value; 
             let type = currentMode.toUpperCase();
-            
             if (currentMode === 'adj') {
                 const adjAction = document.querySelector('input[name="adjustAction"]:checked').value;
                 type = adjAction === 'plus' ? 'ADJ_IN' : 'ADJ_OUT';
             }
 
             const params = new URLSearchParams({
-                action: 'request',
-                type: type,
+                action: 'request', type: type,
                 projectLoc: document.getElementById("modalSiteSelect").value,
                 itemId: document.getElementById("modalItemSelect").value,
                 qty: document.getElementById("modalQty").value,
@@ -602,47 +596,34 @@
                 const res = await fetch(WEB_APP_URL + "?" + params.toString());
                 const result = await res.json();
                 if(result.status === 'success') {
-                    showToast("ส่งคำร้องขอทำรายการเรียบร้อย!");
-                    closeModal();
-                    fetchSheetData(); // โหลดใหม่เพื่อโชว์ในรออนุมัติ
-                } else {
-                    alert(result.message);
-                }
+                    showToast("ส่งคำร้องสำเร็จ!");
+                    closeModal(); fetchSheetData();
+                } else { alert(result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); } 
             finally { submitBtn.innerText = originalText; submitBtn.disabled = false; }
         }
 
-        // 3. ฟังก์ชันอนุมัติ/ปฏิเสธรายการ
+        // 3. ฟังก์ชันอนุมัติ
         async function approveTransaction(transId, isApprove) {
-            if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
-
-            const action = isApprove ? 'approve' : 'reject';
-            const params = new URLSearchParams({ action: action, transId: transId, t: new Date().getTime() });
-            
+            if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} ใช่หรือไม่?`)) return;
+            const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
             try {
                 const res = await fetch(WEB_APP_URL + "?" + params.toString());
                 const result = await res.json();
-                if(result.status === 'success') {
-                    showToast(result.message);
-                    fetchSheetData(); // ซิงค์ใหม่เพื่อตัดสต็อกและลบออกจากคิว
-                } else {
-                    alert("ข้อผิดพลาด: " + result.message);
-                }
+                if(result.status === 'success') { showToast(result.message); fetchSheetData(); } 
+                else { alert(result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); }
         }
 
-        // 4. แก้ไขปุ่มในตาราง รออนุมัติ (เพิ่มปุ่มปฏิเสธ)
         function renderApprovalTable() {
             const tbody = document.getElementById("approvalTableBody");
             if (!tbody) return;
             tbody.innerHTML = "";
             let pendingItems = transactionsDatabase.filter(t => t.status === 'รออนุมัติ');
-            
             if (pendingItems.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400 font-bold">🎉 ไม่มีรายการรออนุมัติ</td></tr>`;
                 return;
             }
-
             pendingItems.forEach(item => {
                 let badgeColor = item.typeRaw.includes('OUT') ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
                 tbody.innerHTML += `
@@ -660,25 +641,19 @@
             });
         }
 
+        // จัดการข้อมูลเข้า UI 
         function onDataLoaded(rawSheetData) {
             inventoryData = [];
-            let totalCompanyInVal = 0;
-            let totalCompanyStockVal = 0;
-            
+            let totalCompanyInVal = 0, totalCompanyStockVal = 0;
             let siteTotals = {
-                "สโตร์กลาง": { stockVal: 0, inVal: 0 },
-                "ทวีวงษ์ New factory": { stockVal: 0, inVal: 0 },
-                "บุญพา": { stockVal: 0, inVal: 0 },
-                "บ้านคุณบี": { stockVal: 0, inVal: 0 },
-                "บ้านคุณอรรถา": { stockVal: 0, inVal: 0 },
-                "KVG อาคารเก็บสินค้า": { stockVal: 0, inVal: 0 },
-                "ศิริชัย": { stockVal: 0, inVal: 0 }
+                "สโตร์กลาง": { stockVal: 0, inVal: 0 }, "ทวีวงษ์ New factory": { stockVal: 0, inVal: 0 },
+                "บุญพา": { stockVal: 0, inVal: 0 }, "บ้านคุณบี": { stockVal: 0, inVal: 0 },
+                "บ้านคุณอรรถา": { stockVal: 0, inVal: 0 }, "KVG อาคารเก็บสินค้า": { stockVal: 0, inVal: 0 }, "ศิริชัย": { stockVal: 0, inVal: 0 }
             };
 
             for (let code in rawSheetData) {
                 let item = rawSheetData[code];
-                let unitPrice = 150;
-
+                let unitPrice = item.price || 0; // ดึงราคาจริงจากฐานข้อมูลแล้ว ไม่ใช่ Mock 150 บาท
                 let siteStocks = { "all": 0 };
                 let itemTotalStock = 0;
 
@@ -686,294 +661,134 @@
                     let qty = item.stocks[site];
                     siteStocks[site] = qty;
                     itemTotalStock += qty;
-                    
                     if (siteTotals[site]) {
                         siteTotals[site].stockVal += (qty * unitPrice);
                         siteTotals[site].inVal += (qty * unitPrice * 1.2);
                     }
                 }
                 siteStocks["all"] = itemTotalStock;
-
                 totalCompanyStockVal += (itemTotalStock * unitPrice);
                 totalCompanyInVal += (itemTotalStock * unitPrice * 1.2);
 
                 inventoryData.push({
-                    id: item.code,
-                    name: item.name || "วัสดุก่อสร้าง",
-                    category: "โครงสร้าง",
-                    min: 50,
-                    unit: item.unit || "หน่วย",
-                    unitPrice: unitPrice,
-                    location: "คลังหลัก",
-                    siteStocks: siteStocks
+                    id: item.code, name: item.name || "ไม่มีชื่อ", category: item.cat || "ไม่ระบุ",
+                    min: item.safe, unit: item.unit || "หน่วย", unitPrice: unitPrice, location: "ดึงจากโปรเจกต์", siteStocks: siteStocks
                 });
             }
 
             materialProjectData = {
-                "all": { name: "รวมทุกโครงการ (ภาพรวมบริษัท)", icon: "🌐", inVal: "฿" + totalCompanyInVal.toLocaleString(), stock: "฿" + totalCompanyStockVal.toLocaleString(), usedVal: "฿" + (totalCompanyInVal - totalCompanyStockVal).toLocaleString(), pct: "81.3%", low: 0, status: "ภาพรวมทั้งบริษัท" },
-                "ทวีวงษ์ New factory": { name: "ทวีวงษ์ New factory", icon: "🏗️", inVal: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "81.6%", low: 0, status: "เบิกใช้ต่อเนื่อง" },
-                "สโตร์กลาง": { name: "สโตร์กลาง", icon: "🏢", inVal: "฿" + (siteTotals["สโตร์กลาง"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["สโตร์กลาง"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "71.9%", low: 0, status: "พร้อมจ่ายของ" },
-                "บุญพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุญพา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บุญพา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "83.3%", low: 0, status: "งานสถาปัตย์" },
-                "บ้านคุณบี": { name: "บ้านคุณบี", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณบี"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณบี"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "89.0%", low: 0, status: "งานระบบ" },
-                "บ้านคุณอรรถา": { name: "บ้านคุณอรรถา", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณอรรถา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณอรรถา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "90.2%", low: 0, status: "งานตกแต่ง" },
-                "ศิริชัย": { name: "ศิริชัย", icon: "🏗️", inVal: "฿" + (siteTotals["ศิริชัย"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ศิริชัย"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "90.4%", low: 0, status: "งานเก็บงาน" },
-                "KVG อาคารเก็บสินค้า": { name: "KVG อาคารเก็บสินค้า", icon: "🏬", inVal: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "81.0%", low: 0, status: "งานโครงสร้าง" }
+                "all": { name: "รวมทุกโครงการ (ภาพรวมบริษัท)", icon: "🌐", inVal: "฿" + totalCompanyInVal.toLocaleString(), stock: "฿" + totalCompanyStockVal.toLocaleString(), usedVal: "฿" + (totalCompanyInVal - totalCompanyStockVal).toLocaleString() },
+                "ทวีวงษ์ New factory": { name: "ทวีวงษ์ New factory", icon: "🏗️", inVal: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "สโตร์กลาง": { name: "สโตร์กลาง", icon: "🏢", inVal: "฿" + (siteTotals["สโตร์กลาง"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["สโตร์กลาง"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "บุญพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุญพา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บุญพา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "บ้านคุณบี": { name: "บ้านคุณบี", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณบี"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณบี"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "บ้านคุณอรรถา": { name: "บ้านคุณอรรถา", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณอรรถา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณอรรถา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "ศิริชัย": { name: "ศิริชัย", icon: "🏗️", inVal: "฿" + (siteTotals["ศิริชัย"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ศิริชัย"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "KVG อาคารเก็บสินค้า": { name: "KVG อาคารเก็บสินค้า", icon: "🏬", inVal: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" }
             };
 
-            initCharts();
-            initReportCharts();
-            populateModalMaterials();
-            renderAll();
-            openProjectDrilldown("all");
+            initCharts(); initReportCharts(); populateModalMaterials(); renderAll(); openProjectDrilldown("all");
         }
 
-        function syncSiteFilter(selectedSite) {
-            const headerSelect = document.getElementById("siteFilter");
-            const tableSelect = document.getElementById("tableSiteFilter");
-            if (headerSelect) headerSelect.value = selectedSite;
-            if (tableSelect) tableSelect.value = selectedSite;
-            renderAll();
+        // ========================== ฟังก์ชัน Rendering ฝั่ง UI ที่เหลือ ==========================
+        function syncSiteFilter(selectedSite) { document.getElementById("siteFilter").value = selectedSite; renderAll(); }
+        function populateModalMaterials() { 
+            const select = document.getElementById("modalItemSelect"); if (!select) return;
+            let optionsHTML = '<option value="" disabled selected>-- พิมพ์ค้นหาวัสดุ --</option>';
+            inventoryData.forEach(item => { optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${item.siteStocks["all"]} ${item.unit})</option>`; });
+            select.innerHTML = optionsHTML; 
         }
-
-        function populateModalMaterials() {
-            const select = document.getElementById("modalItemSelect");
-            if (!select) return;
-            
-            // สร้าง Option แบบรวดเดียวจบ (ใช้ String แทนการสร้าง Node ทีละอันเพื่อลดภาระเครื่อง)
-            let optionsHTML = '<option value="" disabled selected>-- พิมพ์เพื่อค้นหา หรือเลือกวัสดุ --</option>';
-            
-            inventoryData.forEach(item => {
-                optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${item.siteStocks["all"]} ${item.unit})</option>`;
+        function switchView(viewName) { 
+            ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
+                const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
             });
-            
-            select.innerHTML = optionsHTML;
+            const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); lucide.createIcons(); 
         }
-
-        function updateLiveStockHint() {}
-
-        function switchView(viewName) {
-            const allViews = ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'];
-            allViews.forEach(v => {
-                const el = document.getElementById(`view-${v}`);
-                if (el) el.classList.add('hidden');
-            });
-            const current = document.getElementById(`view-${viewName}`);
-            if (current) current.classList.remove('hidden');
-            lucide.createIcons();
-        }
-
         function toggleTransactionSubmenu() { document.getElementById("transSubmenu").classList.toggle("hidden"); }
         function toggleReportSubmenu() { document.getElementById("reportSubmenu").classList.toggle("hidden"); }
-
-        function renderAll() {
-            renderInventoryTable();
-            renderLowStockAlertTable();
-            renderProjectCardsGrid();
-            renderSubmenuHistoryTables();
-            renderApprovalTable();
-        }
+        function renderAll() { renderInventoryTable(); renderLowStockAlertTable(); renderProjectCardsGrid(); renderSubmenuHistoryTables(); renderApprovalTable(); }
 
         function renderLowStockAlertTable() {
-            const tbody = document.getElementById("lowStockAlertTableBody");
-            if (!tbody) return;
-            tbody.innerHTML = "";
-            let lowStockItems = [];
-
-            inventoryData.forEach(item => {
-                if (item.siteStocks["all"] <= item.min) {
-                    lowStockItems.push({ ...item, deficit: item.min - item.siteStocks["all"] });
-                }
-            });
-
+            const tbody = document.getElementById("lowStockAlertTableBody"); if (!tbody) return;
+            let lowStockItems = inventoryData.filter(i => i.siteStocks["all"] <= i.min);
             document.getElementById("card-low-stock").innerText = `${lowStockItems.length} รายการ`;
-            const badge = document.getElementById("lowStockTableBadge");
-            if (badge) badge.innerText = `${lowStockItems.length} รายการ`;
-
-            if (lowStockItems.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-emerald-600 font-bold">✅ สต็อกเพียงพอทุกรายการ</td></tr>`;
-                return;
-            }
-
-            lowStockItems.forEach(item => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
-                    <td class="py-3 px-4 font-bold">${item.name}</td>
-                    <td class="py-3 px-4 text-right font-bold text-rose-600">${item.siteStocks["all"]}</td>
-                    <td class="py-3 px-4 text-right">${item.min}</td>
-                    <td class="py-3 px-4 text-center"><span class="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded font-bold">สต็อกต่ำ</span></td>
-                `;
-                tbody.appendChild(tr);
+            const badge = document.getElementById("lowStockTableBadge"); if (badge) badge.innerText = `${lowStockItems.length} รายการ`;
+            
+            if (lowStockItems.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-emerald-600 font-bold">✅ สต็อกเพียงพอทุกรายการ</td></tr>`; return; }
+            let html = '';
+            lowStockItems.slice(0, 100).forEach(item => { // Limit for UI performance
+                html += `<tr><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold">${item.name}</td><td class="py-3 px-4 text-right font-bold text-rose-600">${item.siteStocks["all"]}</td><td class="py-3 px-4 text-right">${item.min}</td><td class="py-3 px-4 text-center"><span class="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded font-bold">สต็อกต่ำ</span></td></tr>`;
             });
+            tbody.innerHTML = html;
         }
 
         function renderProjectCardsGrid() {
-            const container = document.getElementById("projectCardsContainer");
-            if (!container) return;
-            container.innerHTML = "";
-
+            const container = document.getElementById("projectCardsContainer"); if (!container) return; container.innerHTML = "";
             Object.entries(materialProjectData).forEach(([siteKey, p]) => {
                 const isActive = (siteKey === currentDrilldownSite);
-                const card = document.createElement("div");
-                card.className = `p-4 rounded-2xl border-2 transition-all cursor-pointer bg-white hover:border-amber-400 ${isActive ? 'project-card-active' : 'border-slate-200'}`;
-                card.onclick = () => openProjectDrilldown(siteKey);
-
-                card.innerHTML = `
-                    <div class="flex items-center justify-between mb-2">
-                        <h4 class="font-bold text-slate-900 text-sm">${p.icon} ${p.name}</h4>
-                        ${isActive ? '<span class="bg-amber-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full">กำลังดู</span>' : ''}
-                    </div>
-                    <p class="text-xs text-slate-500">คงเหลือ: <span class="font-bold text-emerald-600">${p.stock}</span></p>
-                `;
-                container.appendChild(card);
+                container.innerHTML += `<div onclick="openProjectDrilldown('${siteKey}')" class="p-4 rounded-2xl border-2 transition-all cursor-pointer bg-white hover:border-amber-400 ${isActive ? 'project-card-active' : 'border-slate-200'}"><div class="flex items-center justify-between mb-2"><h4 class="font-bold text-slate-900 text-sm">${p.icon} ${p.name}</h4>${isActive ? '<span class="bg-amber-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full">กำลังดู</span>' : ''}</div><p class="text-xs text-slate-500">คงเหลือ: <span class="font-bold text-emerald-600">${p.stock}</span></p></div>`;
             });
         }
 
         function openProjectDrilldown(siteName) {
             currentDrilldownSite = siteName;
             const p = materialProjectData[siteName] || materialProjectData["all"];
-
             document.getElementById("metricProjectName").innerText = `${p.icon} ${p.name}`;
             document.getElementById("metricTotalIn").innerText = p.inVal;
             document.getElementById("metricStockVal").innerText = p.stock;
             document.getElementById("metricUsedVal").innerText = p.usedVal;
-
-            renderProjectCardsGrid();
-            renderDrilldownTable();
+            renderProjectCardsGrid(); renderDrilldownTable();
         }
 
         function renderDrilldownTable() {
-            const tbody = document.getElementById("projectDrilldownTableBody");
-            if (!tbody) return;
-            tbody.innerHTML = "";
-
-            inventoryData.forEach(item => {
+            const tbody = document.getElementById("projectDrilldownTableBody"); if (!tbody) return;
+            let html = '';
+            inventoryData.slice(0, 200).forEach(item => { // Limit for UI performance
                 let stock = currentDrilldownSite === "all" ? item.siteStocks["all"] : (item.siteStocks[currentDrilldownSite] || 0);
                 let totalVal = stock * item.unitPrice;
-
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
-                    <td class="py-3 px-4 font-bold">${item.name}</td>
-                    <td class="py-3 px-4 text-right font-bold">${stock.toLocaleString()}</td>
-                    <td class="py-3 px-4 text-right font-mono">฿${item.unitPrice.toLocaleString()}</td>
-                    <td class="py-3 px-4 text-right font-bold text-emerald-700 font-mono">฿${totalVal.toLocaleString()}</td>
-                `;
-                tbody.appendChild(tr);
+                html += `<tr><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold">${item.name}</td><td class="py-3 px-4 text-right font-bold">${stock.toLocaleString()}</td><td class="py-3 px-4 text-right font-mono">฿${item.unitPrice.toLocaleString()}</td><td class="py-3 px-4 text-right font-bold text-emerald-700 font-mono">฿${totalVal.toLocaleString()}</td></tr>`;
             });
+            tbody.innerHTML = html;
         }
 
         function renderSubmenuHistoryTables() {
             const outTbody = document.getElementById("transOutTableBody");
             const inTbody = document.getElementById("transInTableBody");
             const adjTbody = document.getElementById("transAdjTableBody");
-
-            if (outTbody) outTbody.innerHTML = "";
-            if (inTbody) inTbody.innerHTML = "";
-            if (adjTbody) adjTbody.innerHTML = "";
+            if (outTbody) outTbody.innerHTML = ""; if (inTbody) inTbody.innerHTML = ""; if (adjTbody) adjTbody.innerHTML = "";
 
             transactionsDatabase.forEach(item => {
-                const statusBadge = item.status === 'รออนุมัติ' 
-                    ? `<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded font-bold">⏳ รออนุมัติ</span>`
-                    : `<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded font-bold">✓ อนุมัติ</span>`;
-
-                if (item.mode === 'out' && outTbody) {
-                    outTbody.innerHTML += `
-                        <tr class="hover:bg-slate-50">
-                            <td class="py-3 px-4 text-xs">${item.date}</td>
-                            <td class="py-3 px-4 font-mono font-bold text-xs">${item.id}</td>
-                            <td class="py-3 px-4 font-medium">${item.site}</td>
-                            <td class="py-3 px-4 font-bold">${item.itemName}</td>
-                            <td class="py-3 px-4 text-right font-bold text-amber-600">${item.qty} ${item.unit}</td>
-                            <td class="py-3 px-4 text-xs">${item.requester}</td>
-                            <td class="py-3 px-4 text-center">${statusBadge}</td>
-                        </tr>`;
-                }
-                if (item.mode === 'in' && inTbody) {
-                    inTbody.innerHTML += `
-                        <tr class="hover:bg-slate-50">
-                            <td class="py-3 px-4 text-xs">${item.date}</td>
-                            <td class="py-3 px-4 font-mono font-bold text-xs">${item.id}</td>
-                            <td class="py-3 px-4 font-medium">${item.site}</td>
-                            <td class="py-3 px-4 font-bold">${item.itemName}</td>
-                            <td class="py-3 px-4 text-right font-bold text-emerald-600">${item.qty} ${item.unit}</td>
-                            <td class="py-3 px-4 text-xs">${item.requester}</td>
-                            <td class="py-3 px-4 text-center">${statusBadge}</td>
-                        </tr>`;
-                }
-            });
-        }
-
-        function renderApprovalTable() {
-            const tbody = document.getElementById("approvalTableBody");
-            if (!tbody) return;
-            tbody.innerHTML = "";
-            transactionsDatabase.filter(t => t.status === 'รออนุมัติ').forEach(item => {
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50">
-                        <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
-                        <td class="py-3 px-4 font-medium">${item.site}</td>
-                        <td class="py-3 px-4 font-bold">${item.itemName}</td>
-                        <td class="py-3 px-4 text-right font-bold">${item.qty} ${item.unit}</td>
-                        <td class="py-3 px-4 text-xs">${item.requester}</td>
-                        <td class="py-3 px-4 text-center">
-                            <button onclick="approveTransaction('${item.id}', true)" class="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded font-bold">อนุมัติ</button>
-                        </td>
-                    </tr>`;
+                let b = item.status === 'รออนุมัติ' ? `<span class="bg-amber-100 text-amber-800 text-xs px-2 rounded font-bold">⏳ รออนุมัติ</span>` : (item.status === 'อนุมัติ' ? `<span class="bg-emerald-100 text-emerald-800 text-xs px-2 rounded font-bold">✓ อนุมัติ</span>` : `<span class="bg-rose-100 text-rose-800 text-xs px-2 rounded font-bold">✗ ปฏิเสธ</span>`);
+                const html = `<tr class="hover:bg-slate-50"><td class="py-3 px-4 text-xs">${item.date}</td><td class="py-3 px-4 font-mono font-bold text-xs">${item.id}</td><td class="py-3 px-4 font-medium">${item.site}</td><td class="py-3 px-4 font-bold">${item.itemName}</td><td class="py-3 px-4 text-right font-bold text-slate-600">${item.qty} ${item.unit}</td><td class="py-3 px-4 text-xs">${item.requester}</td><td class="py-3 px-4 text-center">${b}</td></tr>`;
+                
+                if (item.mode === 'out' && outTbody) outTbody.innerHTML += html;
+                if (item.mode === 'in' && inTbody) inTbody.innerHTML += html;
+                if (item.mode === 'adj' && adjTbody) adjTbody.innerHTML += html;
             });
         }
 
         function renderInventoryTable() {
-            const tbody = document.getElementById("inventoryTableBody");
-            if (!tbody) return;
+            const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
+            const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
+            let data = term ? inventoryData.filter(i => i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term)) : inventoryData;
             
-            // ดึงค่าการค้นหา
-            const searchTerm = (document.getElementById("searchInput")?.value || "").toLowerCase();
+            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500">ไม่พบข้อมูล</td></tr>`; return; }
             
-            // กรองข้อมูล (ถ้ามีค้นหา) และจำกัดการแสดงผลแค่ 200 รายการแรก เพื่อไม่ให้เครื่องค้าง
-            let filteredData = inventoryData;
-            if (searchTerm) {
-                filteredData = inventoryData.filter(item => 
-                    item.name.toLowerCase().includes(searchTerm) || item.id.toLowerCase().includes(searchTerm)
-                );
-            }
-            
-            const displayData = filteredData.slice(0, 200); // โชว์แค่ 200 รายการ เพื่อความลื่นไหล
-            let tableHTML = '';
-            
-            if (displayData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 font-medium">ไม่พบรายการวัสดุ</td></tr>`;
-                return;
-            }
-
-            displayData.forEach(item => {
-                tableHTML += `
-                    <tr class="hover:bg-slate-50 border-b border-slate-100">
-                        <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
-                        <td class="py-3 px-4 font-bold text-slate-800">${item.name}</td>
-                        <td class="py-3 px-4 text-xs"><span class="bg-slate-100 px-2 py-1 rounded-md border">${item.category}</span></td>
-                        <td class="py-3 px-4 text-right font-bold text-slate-900">${item.siteStocks["all"]}</td>
-                        <td class="py-3 px-4 text-right text-slate-400">${item.min}</td>
-                        <td class="py-3 px-4 text-xs">${item.unit}</td>
-                        <td class="py-3 px-4 text-center"><span class="text-emerald-600 font-bold text-xs">● ปกติ</span></td>
-                        <td class="py-3 px-4 text-xs">${item.location}</td>
-                        <td class="py-3 px-4 text-center"><button class="text-xs bg-slate-100 border hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold transition">ปรับสต็อก</button></td>
-                    </tr>`;
+            let html = '';
+            data.slice(0, 200).forEach(item => { // Limit for UI performance
+                html += `<tr class="hover:bg-slate-50 border-b"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-xs"><span class="bg-slate-100 px-2 py-1 rounded-md border">${item.category}</span></td><td class="py-3 px-4 text-right font-bold text-slate-900">${item.siteStocks["all"]}</td><td class="py-3 px-4 text-right text-slate-400">${item.min}</td><td class="py-3 px-4 text-xs">${item.unit}</td><td class="py-3 px-4 text-center"><span class="text-emerald-600 font-bold text-xs">● ปกติ</span></td><td class="py-3 px-4 text-xs">ระบุไซต์</td><td class="py-3 px-4 text-center"><button class="text-xs bg-slate-100 border hover:bg-slate-200 px-3 py-1.5 rounded-lg">ปรับสต็อก</button></td></tr>`;
             });
-            
-            tbody.innerHTML = tableHTML;
+            tbody.innerHTML = html;
         }
 
-        function openTransactionModal(type) { document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); }
-        function closeModal() { document.getElementById("transModal").classList.add("hidden"); }
-        function handleTransactionSubmit(e) { e.preventDefault(); showToast("บันทึกสำเร็จ"); closeModal(); }
-        function showToast(msg) {
-            const toast = document.getElementById("toast");
-            document.getElementById("toastMessage").innerText = msg;
-            toast.classList.remove("hidden");
-            toast.classList.add("flex");
-            setTimeout(() => { toast.classList.add("hidden"); }, 3000);
+        function openTransactionModal(type) { 
+            document.getElementById("formCurrentMode").value = type;
+            const adj = document.getElementById("adjTypeContainer");
+            if (type === 'adj') adj.classList.remove('hidden'); else adj.classList.add('hidden');
+            document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); 
         }
+        function closeModal() { document.getElementById("transModal").classList.add("hidden"); document.getElementById("transModal").classList.remove("flex"); }
+        function showToast(msg) { const toast = document.getElementById("toast"); document.getElementById("toastMessage").innerText = msg; toast.classList.remove("hidden"); toast.classList.add("flex"); setTimeout(() => { toast.classList.add("hidden"); toast.classList.remove("flex"); }, 3000); }
 
         function initCharts() {
             const ctx1 = document.getElementById('usageTrendChart')?.getContext('2d');
