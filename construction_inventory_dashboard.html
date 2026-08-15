@@ -738,13 +738,15 @@
         function populateModalMaterials() {
             const select = document.getElementById("modalItemSelect");
             if (!select) return;
-            select.innerHTML = "";
+            
+            // สร้าง Option แบบรวดเดียวจบ (ใช้ String แทนการสร้าง Node ทีละอันเพื่อลดภาระเครื่อง)
+            let optionsHTML = '<option value="" disabled selected>-- พิมพ์เพื่อค้นหา หรือเลือกวัสดุ --</option>';
+            
             inventoryData.forEach(item => {
-                const opt = document.createElement("option");
-                opt.value = item.id;
-                opt.innerText = `${item.name} (คงเหลือ: ${item.siteStocks["all"]} ${item.unit})`;
-                select.appendChild(opt);
+                optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${item.siteStocks["all"]} ${item.unit})</option>`;
             });
+            
+            select.innerHTML = optionsHTML;
         }
 
         function updateLiveStockHint() {}
@@ -924,21 +926,42 @@
         function renderInventoryTable() {
             const tbody = document.getElementById("inventoryTableBody");
             if (!tbody) return;
-            tbody.innerHTML = "";
-            inventoryData.forEach(item => {
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50">
+            
+            // ดึงค่าการค้นหา
+            const searchTerm = (document.getElementById("searchInput")?.value || "").toLowerCase();
+            
+            // กรองข้อมูล (ถ้ามีค้นหา) และจำกัดการแสดงผลแค่ 200 รายการแรก เพื่อไม่ให้เครื่องค้าง
+            let filteredData = inventoryData;
+            if (searchTerm) {
+                filteredData = inventoryData.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm) || item.id.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            const displayData = filteredData.slice(0, 200); // โชว์แค่ 200 รายการ เพื่อความลื่นไหล
+            let tableHTML = '';
+            
+            if (displayData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 font-medium">ไม่พบรายการวัสดุ</td></tr>`;
+                return;
+            }
+
+            displayData.forEach(item => {
+                tableHTML += `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
                         <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
-                        <td class="py-3 px-4 font-bold">${item.name}</td>
-                        <td class="py-3 px-4 text-xs">${item.category}</td>
-                        <td class="py-3 px-4 text-right font-bold">${item.siteStocks["all"]}</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${item.name}</td>
+                        <td class="py-3 px-4 text-xs"><span class="bg-slate-100 px-2 py-1 rounded-md border">${item.category}</span></td>
+                        <td class="py-3 px-4 text-right font-bold text-slate-900">${item.siteStocks["all"]}</td>
                         <td class="py-3 px-4 text-right text-slate-400">${item.min}</td>
                         <td class="py-3 px-4 text-xs">${item.unit}</td>
                         <td class="py-3 px-4 text-center"><span class="text-emerald-600 font-bold text-xs">● ปกติ</span></td>
                         <td class="py-3 px-4 text-xs">${item.location}</td>
-                        <td class="py-3 px-4 text-center"><button class="text-xs bg-slate-100 px-2 py-1 rounded">ปรับสต็อก</button></td>
+                        <td class="py-3 px-4 text-center"><button class="text-xs bg-slate-100 border hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold transition">ปรับสต็อก</button></td>
                     </tr>`;
             });
+            
+            tbody.innerHTML = tableHTML;
         }
 
         function openTransactionModal(type) { document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); }
