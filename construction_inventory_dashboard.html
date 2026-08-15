@@ -479,17 +479,15 @@
 
     <!-- JavaScript Engine -->
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx0w0mi3GcuZbmBkwF9hS0kWNnlw9S0D3PJEnUbgKqDHu4i_zkkzKdPCm3yH420dc488w/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyXZ4u_GNJ_hO9VBuka4grZaAsK0OwPa159JPzwpqAPY2AQcyawc9opviEAEjUmCQ4PKw/exec"; 
 
         let currentDrilldownSite = "all";
         let inventoryData = [];
         let materialProjectData = {};
         let transactionsDatabase = [];
-        let activeNavButton = 'nav-dashboard'; 
+        let currentActiveView = 'dashboard'; // จดจำหน้าปัจจุบัน
 
-        // =====================================
-        // ท่าไม้ตาย: ระบบดึงข้อมูลแบบ JSONP (ทะลวง CORS 100%)
-        // =====================================
+        // ท่าไม้ตาย JSONP ทะลวง CORS
         function fetchJSONP(url) {
             return new Promise((resolve, reject) => {
                 const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
@@ -515,25 +513,38 @@
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
+            // อัปเดตจำนวนคงเหลือใน Modal ทันทีเมื่อเปลี่ยนรายการวัสดุ [ข้อ 6]
             document.getElementById("modalItemSelect").addEventListener('change', function(e) {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                const match = selectedOption.text.match(/คงเหลือ: ([\d,\.]+) (.*)\)/);
-                document.getElementById("liveStockBadge").innerText = match ? `คงเหลือ: ${match[1]} ${match[2]}` : `คงเหลือ: 0`;
+                const selectedId = e.target.value;
+                const selectedSite = document.getElementById("modalSiteSelect").value;
+                const item = inventoryData.find(i => i.id === selectedId);
+                
+                if (item) {
+                    // ดึงสต็อกตามไซต์ที่เลือกใน Modal
+                    let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? item.siteStocks["all"] : item.siteStocks[selectedSite];
+                    document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${stock.toLocaleString()} ${item.unit}`;
+                } else {
+                    document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
+                }
+            });
+
+            // อัปเดตสต็อกเมื่อเปลี่ยนไซต์ใน Modal ด้วย
+            document.getElementById("modalSiteSelect").addEventListener('change', function() {
+                document.getElementById("modalItemSelect").dispatchEvent(new Event('change'));
             });
         });
 
-        // =====================================
-        // โหลดข้อมูลหลัก
-        // =====================================
-        async function fetchSheetData() {
-            const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังดึงข้อมูลแบบ Real-time...</p></td></tr>`;
-            ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody', 'projectDrilldownTableBody'].forEach(id => {
-                const el = document.getElementById(id); if(el) el.innerHTML = loaderHTML;
-            });
-            lucide.createIcons();
+        // โหลดข้อมูลหลัก (โดยไม่รีเซ็ตหน้าจอที่ผู้ใช้อยู่)
+        async function fetchSheetData(isSilent = false) {
+            if (!isSilent) {
+                const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังดึงข้อมูลแบบ Real-time...</p></td></tr>`;
+                ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody', 'projectDrilldownTableBody'].forEach(id => {
+                    const el = document.getElementById(id); if(el) el.innerHTML = loaderHTML;
+                });
+                lucide.createIcons();
+            }
 
             try {
-                // เรียกใช้ JSONP แทน fetch ปกติ
                 const result = await fetchJSONP(WEB_APP_URL + "?action=load&t=" + new Date().getTime());
                 
                 if (result.status === 'success') {
@@ -565,17 +576,15 @@
 
                     onDataLoaded(rawSheetData);
                 } else { alert("Error: " + result.message); }
-            } catch (e) { alert("⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลข้ามโดเมน"); console.error(e); }
+            } catch (e) { console.error(e); }
         }
 
-        // =====================================
-        // บันทึกรายการ (ขอเบิก/รับเข้า)
-        // =====================================
+        // บันทึกรายการ (ขอเบิก / รับเข้า / ปรับปรุง) [ข้อ 3, 4, 5]
         async function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerText;
-            submitBtn.innerText = "กำลังประมวลผล...";
+            submitBtn.innerText = "กำลังบันทึก...";
             submitBtn.disabled = true;
 
             const currentMode = document.getElementById("formCurrentMode").value; 
@@ -600,33 +609,54 @@
                 const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
                 if(result.status === 'success') {
                     closeModal();
-                    showToast("ส่งคำร้องสำเร็จ! กำลังอัปเดตหน้าจอ...");
-                    fetchSheetData(); // ดึงข้อมูลอัปเดตทันที
+                    showToast("บันทึกรายการสำเร็จ!");
+                    await fetchSheetData(true); // อัปเดตข้อมูลแบบทันทีโดยไม่รีเซ็ตหน้าจอ
+                    switchView(currentActiveView); // คงอยู่ที่หน้าเดิม
                 } else { alert("Error: " + result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); } 
             finally { submitBtn.innerText = originalText; submitBtn.disabled = false; }
         }
 
-        // =====================================
-        // อนุมัติ/ปฏิเสธ รายการ
-        // =====================================
+        // อนุมัติ / ปฏิเสธ [ข้อ 7]
         async function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
             
             try {
-                showToast("กำลังดำเนินการ...");
+                showToast("กำลังประมวลผล...");
                 const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
                 if(result.status === 'success') {
-                    showToast("ทำรายการสำเร็จ! กำลังอัปเดตสต็อก...");
-                    fetchSheetData(); // ดึงข้อมูลอัปเดตทันที
+                    showToast(result.message);
+                    await fetchSheetData(true); // อัปเดตข้อมูลทันที
+                    switchView(currentActiveView); // อยู่ที่หน้าเดิม
                 } else { alert("Error: " + result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); }
         }
 
-        // =====================================
-        // ฟังก์ชัน UI และ Render ต่างๆ (โค้ดเดิมของคุณ)
-        // =====================================
+        // จัดการเปลี่ยนหน้าจอ [ข้อ 1]
+        function switchView(viewName) { 
+            currentActiveView = viewName; // บันทึกหน้าปัจจุบัน
+            ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
+                const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
+            });
+            const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); 
+            
+            // แมปชื่อ view กับ id ของปุ่มเมนูซ้าย
+            let navId = 'nav-dashboard';
+            if(viewName === 'inventory') navId = 'nav-inventory';
+            else if(viewName === 'trans-out') navId = 'nav-trans-out';
+            else if(viewName === 'trans-in') navId = 'nav-trans-in';
+            else if(viewName === 'trans-adj') navId = 'nav-trans-adj';
+            else if(viewName === 'approvals') navId = 'nav-approvals';
+            else if(viewName === 'projects') navId = 'nav-projects';
+            else if(viewName === 'rep-out') navId = 'nav-rep-out';
+            else if(viewName === 'rep-in') navId = 'nav-rep-in';
+            else if(viewName === 'rep-overview') navId = 'nav-rep-overview';
+
+            updateActiveNav(navId);
+            lucide.createIcons(); 
+        }
+
         function updateActiveNav(navId) {
             const allNavs = ['nav-dashboard', 'nav-inventory', 'nav-trans-out', 'nav-trans-in', 'nav-trans-adj', 'nav-approvals', 'nav-projects', 'nav-rep-out', 'nav-rep-in', 'nav-rep-overview'];
             allNavs.forEach(id => {
@@ -656,21 +686,13 @@
             }
         }
 
-        function switchView(viewName) { 
-            ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
-                const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
-            });
-            const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); 
-            updateActiveNav(`nav-${viewName}`);
-            lucide.createIcons(); 
-        }
-
+        // หัวตารางรายการวัสดุอุปกรณ์ [ข้อ 2]
         function renderInventoryTable() {
             const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
             const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
             let data = term ? inventoryData.filter(i => i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term)) : inventoryData;
             
-            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500">ไม่พบข้อมูล</td></tr>`; return; }
+            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500">ไม่พบข้อมูล</td></tr>`; return; }
             
             let html = `
                 <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b">
@@ -740,7 +762,7 @@
                 "KVG อาคารเก็บสินค้า": { name: "KVG อาคารเก็บสินค้า", icon: "🏬", inVal: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" }
             };
 
-            initCharts(); initReportCharts(); populateModalMaterials(); renderAll(); openProjectDrilldown("all");
+            initCharts(); initReportCharts(); populateModalMaterials(); renderAll(); openProjectDrilldown(currentDrilldownSite);
         }
 
         function syncSiteFilter(selectedSite) { document.getElementById("siteFilter").value = selectedSite; renderAll(); }
@@ -861,13 +883,18 @@
             else if(type === 'out') t.innerText = "เบิกจ่ายวัสดุ";
             else t.innerText = "ปรับปรุงเพิ่ม/ลด สต็อก";
 
-            document.getElementById("liveStockBadge").innerText = "คงเหลือ: 0";
             document.getElementById("modalQty").value = "";
             document.getElementById("modalDoc").value = "";
             document.getElementById("modalPerson").value = "";
             document.getElementById("modalNote").value = "";
 
             document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); 
+            
+            // Trigger อัปเดตยอดคงเหลือเริ่มต้น
+            setTimeout(() => {
+                const itemSelect = document.getElementById("modalItemSelect");
+                if (itemSelect.options.length > 0) itemSelect.dispatchEvent(new Event('change'));
+            }, 100);
         }
         function closeModal() { document.getElementById("transModal").classList.add("hidden"); document.getElementById("transModal").classList.remove("flex"); }
         function showToast(msg) { const toast = document.getElementById("toast"); document.getElementById("toastMessage").innerText = msg; toast.classList.remove("hidden"); toast.classList.add("flex"); setTimeout(() => { toast.classList.add("hidden"); toast.classList.remove("flex"); }, 3000); }
