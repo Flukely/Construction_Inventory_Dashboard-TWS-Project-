@@ -479,68 +479,75 @@
 
     <!-- JavaScript Engine -->
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxYbSTyzZKfYtywV5ZybSwiZjzr_9MSl_gJiLi9kVWKl7YF9vLrWyy5w2PELBjMX0aj7Q/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx0w0mi3GcuZbmBkwF9hS0kWNnlw9S0D3PJEnUbgKqDHu4i_zkkzKdPCm3yH420dc488w/exec"; 
 
         let currentDrilldownSite = "all";
         let inventoryData = [];
         let materialProjectData = {};
         let transactionsDatabase = [];
-        // [บั๊กข้อ 1] ตัวแปรเก็บปุ่มเมนูที่กำลังเลือกอยู่
         let activeNavButton = 'nav-dashboard'; 
+
+        // =====================================
+        // ท่าไม้ตาย: ระบบดึงข้อมูลแบบ JSONP (ทะลวง CORS 100%)
+        // =====================================
+        function fetchJSONP(url) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+                window[callbackName] = function(data) {
+                    delete window[callbackName];
+                    document.body.removeChild(script);
+                    resolve(data);
+                };
+                
+                const script = document.createElement('script');
+                script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
+                script.onerror = function() {
+                    delete window[callbackName];
+                    document.body.removeChild(script);
+                    reject(new Error("JSONP Request Failed"));
+                };
+                document.body.appendChild(script);
+            });
+        }
 
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
             fetchSheetData();
-            updateActiveNav('nav-dashboard'); // เซ็ตค่าเริ่มต้นให้ปุ่มแดชบอร์ดทำงาน
+            updateActiveNav('nav-dashboard'); 
             
-            // [บั๊กข้อ 6] จับ Event เมื่อมีการเปลี่ยนตัวเลือกวัสดุ เพื่ออัปเดตยอดคงเหลือในวงเล็บ
             document.getElementById("modalItemSelect").addEventListener('change', function(e) {
                 const selectedOption = e.target.options[e.target.selectedIndex];
                 const match = selectedOption.text.match(/คงเหลือ: ([\d,\.]+) (.*)\)/);
-                if (match) {
-                    document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${match[1]} ${match[2]}`;
-                } else {
-                    document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
-                }
+                document.getElementById("liveStockBadge").innerText = match ? `คงเหลือ: ${match[1]} ${match[2]}` : `คงเหลือ: 0`;
             });
         });
 
         // =====================================
-        // ฟังก์ชันเชื่อมต่อ Database
+        // โหลดข้อมูลหลัก
         // =====================================
         async function fetchSheetData() {
-            const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังดึงข้อมูลจากระบบ...</p></td></tr>`;
+            const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังดึงข้อมูลแบบ Real-time...</p></td></tr>`;
             ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody', 'projectDrilldownTableBody'].forEach(id => {
-                const el = document.getElementById(id);
-                if(el) el.innerHTML = loaderHTML;
+                const el = document.getElementById(id); if(el) el.innerHTML = loaderHTML;
             });
             lucide.createIcons();
 
             try {
-                const response = await fetch(WEB_APP_URL + "?t=" + new Date().getTime());
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("text/html") !== -1) throw new Error("API_RETURNED_HTML");
-
-                const result = await response.json();
+                // เรียกใช้ JSONP แทน fetch ปกติ
+                const result = await fetchJSONP(WEB_APP_URL + "?action=load&t=" + new Date().getTime());
                 
                 if (result.status === 'success') {
                     let rawSheetData = {};
                     result.inventory.forEach(row => {
                         let code = String(row.Material_ID).trim();
                         if (!rawSheetData[code]) {
-                            rawSheetData[code] = { 
-                                code: code, name: row.Material_Name, unit: row.Unit, 
-                                cat: row.Category, safe: parseFloat(row.Safety_Stock) || 0, price: parseFloat(row.Unit_Price) || 0, stocks: {} 
-                            };
+                            rawSheetData[code] = { code: code, name: row.Material_Name, unit: row.Unit, cat: row.Category, safe: parseFloat(row.Safety_Stock) || 0, price: parseFloat(row.Unit_Price) || 0, stocks: {} };
                         }
                         rawSheetData[code].stocks[row.Location_Project] = parseFloat(row.Current_Qty) || 0;
                     });
                     
                     transactionsDatabase = (result.transactions || []).map(t => {
-                        let mode = "out";
-                        if (t.Type === "IN") mode = "in";
-                        else if (String(t.Type || "").includes("ADJ")) mode = "adj";
-
+                        let mode = "out"; if (t.Type === "IN") mode = "in"; else if (String(t.Type || "").includes("ADJ")) mode = "adj";
                         return {
                             id: t.Transaction_ID, mode: mode, typeRaw: t.Type,
                             date: String(t.Timestamp || "").split('T')[0].split(' ')[0], site: t.Project_Ref,
@@ -558,13 +565,12 @@
 
                     onDataLoaded(rawSheetData);
                 } else { alert("Error: " + result.message); }
-            } catch (e) {
-                if (e.message === "API_RETURNED_HTML") alert("⚠️ Google บล็อกการเชื่อมต่อ! กรุณาเช็กสิทธิ์ Everyone");
-                else alert("⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลข้ามโดเมน");
-            }
+            } catch (e) { alert("⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลข้ามโดเมน"); console.error(e); }
         }
 
-        // [บั๊กข้อ 3, 4, 5] แก้ไข Error ตอนกดปุ่ม โดยใช้เทคนิค No-cors + Time Delay
+        // =====================================
+        // บันทึกรายการ (ขอเบิก/รับเข้า)
+        // =====================================
         async function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -591,56 +597,45 @@
             });
 
             try {
-                // ยิงคำสั่งไปแบบไม่สนใจการตอบกลับจาก Google ทันที (แก้ปัญหา Time out error)
-                fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' });
-                
-                // หน่วงเวลา 2 วินาทีเพื่อให้ Google Sheets ทำงานเสร็จ แล้วโหลดข้อมูลใหม่
-                setTimeout(() => {
+                const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
+                if(result.status === 'success') {
                     closeModal();
-                    showToast("ส่งคำร้องสำเร็จ! กำลังอัปเดตข้อมูล...");
-                    fetchSheetData(); 
-                    submitBtn.innerText = originalText; 
-                    submitBtn.disabled = false;
-                }, 2000);
-                
-            } catch (err) { 
-                alert("เชื่อมต่อล้มเหลว"); 
-                submitBtn.innerText = originalText; 
-                submitBtn.disabled = false;
-            } 
+                    showToast("ส่งคำร้องสำเร็จ! กำลังอัปเดตหน้าจอ...");
+                    fetchSheetData(); // ดึงข้อมูลอัปเดตทันที
+                } else { alert("Error: " + result.message); }
+            } catch (err) { alert("เชื่อมต่อล้มเหลว"); } 
+            finally { submitBtn.innerText = originalText; submitBtn.disabled = false; }
         }
 
-        // [บั๊กข้อ 7] แก้ปัญหาปุ่มอนุมัติ Error
+        // =====================================
+        // อนุมัติ/ปฏิเสธ รายการ
+        // =====================================
         async function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
             
             try {
-                // ยิงคำสั่งและโหลดหน้าใหม่แบบไม่ต้องรอ Response แบบ 100% เพื่อเลี่ยง CORS Error
-                fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' });
-                showToast("กำลังดำเนินการอนุมัติ...");
-                
-                setTimeout(() => { fetchSheetData(); }, 2000); // ดึงข้อมูลใหม่หลังผ่านไป 2 วินาที
-                
+                showToast("กำลังดำเนินการ...");
+                const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
+                if(result.status === 'success') {
+                    showToast("ทำรายการสำเร็จ! กำลังอัปเดตสต็อก...");
+                    fetchSheetData(); // ดึงข้อมูลอัปเดตทันที
+                } else { alert("Error: " + result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); }
         }
 
         // =====================================
-        // ฟังก์ชันจัดการ UI และ Render ตาราง
+        // ฟังก์ชัน UI และ Render ต่างๆ (โค้ดเดิมของคุณ)
         // =====================================
-
-        // [บั๊กข้อ 1] ฟังก์ชันเปลี่ยนสีปุ่มเมนูด้านซ้าย
         function updateActiveNav(navId) {
             const allNavs = ['nav-dashboard', 'nav-inventory', 'nav-trans-out', 'nav-trans-in', 'nav-trans-adj', 'nav-approvals', 'nav-projects', 'nav-rep-out', 'nav-rep-in', 'nav-rep-overview'];
             allNavs.forEach(id => {
                 const el = document.getElementById(id);
                 if(el) {
                     if (id.includes('trans-') || id.includes('rep-')) {
-                        // เมนูย่อย
                         el.classList.remove('bg-slate-800', 'text-amber-400', 'text-emerald-400', 'text-blue-400', 'bg-slate-800/60');
                         el.classList.add('text-slate-300');
                     } else {
-                        // เมนูหลัก
                         el.classList.remove('bg-amber-500', 'text-slate-950', 'font-semibold');
                         el.classList.add('text-slate-400');
                     }
@@ -666,13 +661,10 @@
                 const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
             });
             const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); 
-            
-            // อัปเดตสีปุ่ม
             updateActiveNav(`nav-${viewName}`);
             lucide.createIcons(); 
         }
 
-        // [บั๊กข้อ 2] เพิ่มหัวตาราง "รายการวัสดุก่อสร้างในคลัง"
         function renderInventoryTable() {
             const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
             const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
@@ -680,10 +672,7 @@
             
             if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500">ไม่พบข้อมูล</td></tr>`; return; }
             
-            let html = '';
-            
-            // ใส่หัวตารางที่นี่
-            html += `
+            let html = `
                 <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b">
                     <tr>
                         <th class="py-3 px-4">รหัสวัสดุ</th>
@@ -701,15 +690,11 @@
             data.slice(0, 200).forEach(item => { 
                 let isLow = item.siteStocks["all"] <= item.min;
                 let statusSpan = isLow ? `<span class="bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded text-[11px]">สต็อกต่ำ</span>` : `<span class="text-emerald-600 font-bold text-[11px]">● ปกติ</span>`;
-                
                 html += `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-[11px]"><span class="bg-slate-100 px-2 py-1 rounded-md border">${item.category}</span></td><td class="py-3 px-4 text-right font-bold ${isLow ? 'text-rose-600' : 'text-slate-900'}">${item.siteStocks["all"]}</td><td class="py-3 px-4 text-right text-slate-400 text-[11px]">${item.min}</td><td class="py-3 px-4 text-[11px] text-slate-500">${item.unit}</td><td class="py-3 px-4 text-center">${statusSpan}</td><td class="py-3 px-4 text-center"><button onclick="openTransactionModal('adj')" class="text-[11px] bg-slate-100 border hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold transition">ปรับสต็อก</button></td></tr>`;
             });
             tbody.innerHTML = html;
         }
 
-        // =====================================
-        // ฟังก์ชันประมวลผลข้อมูล
-        // =====================================
         function onDataLoaded(rawSheetData) {
             inventoryData = [];
             let totalCompanyInVal = 0, totalCompanyStockVal = 0;
@@ -758,9 +743,6 @@
             initCharts(); initReportCharts(); populateModalMaterials(); renderAll(); openProjectDrilldown("all");
         }
 
-        // =====================================
-        // ฟังก์ชัน UI ย่อย (ตารางต่างๆ)
-        // =====================================
         function syncSiteFilter(selectedSite) { document.getElementById("siteFilter").value = selectedSite; renderAll(); }
         
         function populateModalMaterials() { 
@@ -869,21 +851,16 @@
             tbody.innerHTML = html;
         }
 
-        // =====================================
-        // UI Controls & Utilities
-        // =====================================
         function openTransactionModal(type) { 
             document.getElementById("formCurrentMode").value = type;
             const adj = document.getElementById("adjTypeContainer");
             if (type === 'adj') adj.classList.remove('hidden'); else adj.classList.add('hidden');
             
-            // เปลี่ยน Title ของ Modal
             const t = document.getElementById("modalTitle");
             if(type === 'in') t.innerText = "รับเข้าวัสดุ / สั่งซื้อ";
             else if(type === 'out') t.innerText = "เบิกจ่ายวัสดุ";
             else t.innerText = "ปรับปรุงเพิ่ม/ลด สต็อก";
 
-            // เคลียร์ค่า
             document.getElementById("liveStockBadge").innerText = "คงเหลือ: 0";
             document.getElementById("modalQty").value = "";
             document.getElementById("modalDoc").value = "";
