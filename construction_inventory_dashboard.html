@@ -492,6 +492,7 @@
         });
 
         // 1. ฟังก์ชันโหลดข้อมูลหลัก (ผ่าน Serverless GET)
+        // 1. ฟังก์ชันโหลดข้อมูลหลัก (ผ่าน Serverless GET)
         async function fetchSheetData() {
             const loaderHTML = `<tr><td colspan="7" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูลแบบ Real-time...</p></td></tr>`;
             ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody'].forEach(id => {
@@ -502,10 +503,17 @@
 
             try {
                 const response = await fetch(WEB_APP_URL + "?t=" + new Date().getTime());
+                
+                // ดักจับ: ถ้า Google ส่งหน้าเว็บ HTML กลับมาแทนที่จะเป็นข้อมูล
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("text/html") !== -1) {
+                    console.error("Google ส่ง HTML กลับมา:", await response.text());
+                    throw new Error("API_RETURNED_HTML");
+                }
+
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    // 1. แปลง Data ให้เข้ากับโครงสร้าง Nested Object เดิมของ UI
                     let rawSheetData = {};
                     result.inventory.forEach(row => {
                         let code = String(row.Material_ID).trim();
@@ -515,17 +523,16 @@
                         rawSheetData[code].stocks[row.Location_Project] = parseFloat(row.Current_Qty) || 0;
                     });
                     
-                    // 2. แปลง Transactions
                     transactionsDatabase = result.transactions.map(t => {
                         let mode = "out";
                         if (t.Type === "IN") mode = "in";
-                        else if (t.Type.includes("ADJ")) mode = "adj";
+                        else if (String(t.Type || "").includes("ADJ")) mode = "adj";
 
                         return {
                             id: t.Transaction_ID,
                             mode: mode,
                             typeRaw: t.Type,
-                            date: t.Timestamp.split(' ')[0],
+                            date: String(t.Timestamp || "").split('T')[0].split(' ')[0],
                             site: t.Project_Ref,
                             itemId: t.Material_ID,
                             itemName: rawSheetData[t.Material_ID]?.name || t.Material_ID,
@@ -535,22 +542,31 @@
                             note: t.Note,
                             status: t.Status === 'PENDING' ? 'รออนุมัติ' : (t.Status === 'APPROVED' ? 'อนุมัติ' : 'ปฏิเสธ')
                         };
-                    }).reverse(); // ให้ข้อมูลล่าสุดอยู่ด้านบน
+                    }).reverse();
 
-                    // อัปเดตตัวเลขแจ้งเตือน Pending
                     const pendingCount = transactionsDatabase.filter(t => t.status === 'รออนุมัติ').length;
                     document.getElementById('pendingBadge').innerText = pendingCount;
                     document.getElementById('card-pending-count').innerText = pendingCount + " รายการ";
                     document.getElementById('pendingSummaryBadge').innerText = pendingCount + " รายการ";
 
-                    // ส่งต่อไปให้ฟังก์ชันประมวลผลเดิมของ UI คุณ
                     onDataLoaded(rawSheetData);
                 } else {
-                    alert("Error โหลดข้อมูล: " + result.message);
+                    alert("Error จากระบบคลังสินค้า: " + result.message);
                 }
             } catch (e) {
                 console.error("Fetch Error:", e);
-                alert("เกิดข้อผิดพลาดในการโหลดข้อมูลข้ามโดเมน (CORS/Network)");
+                // แจ้งเตือนให้ตรงจุด ไม่เหมารวมว่าเป็น CORS แล้ว
+                if (e.message === "API_RETURNED_HTML") {
+                    alert("⚠️ Google บล็อกการเชื่อมต่อ! (ส่งหน้า Login มาแทน)\n\nวิธีแก้:\n1. ตรวจสอบว่าตอน Deploy เลือก 'ทุกคน (Anyone)' หรือยัง\n2. ลองเปิดเว็บในหน้าต่างไม่ระบุตัวตน (Incognito) เพื่อหลีกเลี่ยงบั๊กอีเมลซ้อนกันของ Chrome");
+                } else {
+                    alert("⚠️ เกิดข้อผิดพลาดในการประมวลผลข้อมูลโค้ด (เช็กรายละเอียดที่ Console F12)");
+                }
+                
+                // คืนค่าตารางให้ว่างเปล่า ไม่ค้างที่ Loader
+                ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) el.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-rose-500 font-bold">❌ โหลดข้อมูลล้มเหลว</td></tr>`;
+                });
             }
         }
 
