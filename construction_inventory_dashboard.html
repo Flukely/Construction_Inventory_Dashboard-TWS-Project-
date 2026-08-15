@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการคลังสินค้าและวัสดุก่อสร้าง (Construction Inventory)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f8fafc;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col md:flex-row">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 bg-slate-900 text-white flex-shrink-0">
+        <div class="p-5 flex items-center justify-between border-b border-slate-800">
+            <div class="flex items-center space-x-3">
+                <div class="bg-amber-500 p-2 rounded-lg text-slate-900">
+                    <i data-lucide="hard-hat" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">BuildStock Pro</h1>
+                    <p class="text-xs text-slate-400">ระบบคลังสินค้าก่อสร้าง</p>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="p-4 space-y-1">
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 bg-amber-500 text-slate-950 font-medium rounded-xl transition">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span>แดชบอร์ดหลัก</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
+                <i data-lucide="boxes" class="w-5 h-5"></i>
+                <span>รายการวัสดุอุปกรณ์</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
+                <i data-lucide="arrow-up-right-from-circle" class="w-5 h-5"></i>
+                <span>การเบิกจ่ายวัสดุ</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
+                <i data-lucide="arrow-down-left-to-circle" class="w-5 h-5"></i>
+                <span>รับเข้าวัสดุ / สั่งซื้อ</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
+                <i data-lucide="building-2" class="w-5 h-5"></i>
+                <span>โครงการก่อสร้าง</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <span>รายงานสต็อก</span>
+            </a>
+        </nav>
+
+        <div class="p-4 mt-auto border-t border-slate-800">
+            <div class="bg-slate-800 p-3 rounded-xl flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center font-bold text-slate-950">
+                    วิ
+                </div>
+                <div>
+                    <p class="text-sm font-semibold">วิศวกรสมชาย</p>
+                    <p class="text-xs text-slate-400">ผู้จัดการคลังสินค้า</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
+        
+        <!-- Header -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-10 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">ภาพรวมคลังสินค้าก่อสร้าง</h2>
+                <p class="text-sm text-slate-500">ติดตามสถานะวัสดุ ปริมาณคงเหลือ และการเบิกจ่ายประจำวัน</p>
+            </div>
+
+            <!-- Site / Project Selector & Action Buttons -->
+            <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div class="relative flex-1 sm:flex-none">
+                    <select id="projectFilter" onchange="filterProjectData()" class="w-full bg-slate-100 border border-slate-300 text-slate-700 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-2.5 pr-8 appearance-none font-medium cursor-pointer">
+                        <option value="all">ทุกโครงการ (รวมทั้งหมด)</option>
+                        <option value="p1">โครงการ A: คอนโดมิเนียม สุขุมวิท</option>
+                        <option value="p2">โครงการ B: อาคารสำนักงาน พระราม 9</option>
+                        <option value="p3">โครงการ C: หมู่บ้านจัดสรร ราชพฤกษ์</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-2.5 top-3.5 pointer-events-none"></i>
+                </div>
+
+                <button onclick="openTransactionModal('out')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm transition">
+                    <i data-lucide="minus-circle" class="w-4 h-4"></i>
+                    <span>เบิกวัสดุ</span>
+                </button>
+                <button onclick="openTransactionModal('in')" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm transition">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>รับสินค้าเข้า</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Content Container -->
+        <div class="p-6 space-y-6">
+
+            <!-- KPI Cards Section -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                
+                <!-- Total Valuation -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">มูลค่าสต็อกรวม</p>
+                        <h3 class="text-2xl font-bold text-slate-800 mt-1" id="totalValueText">฿4,250,800</h3>
+                        <span class="text-xs text-emerald-600 font-medium inline-flex items-center mt-1">
+                            <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i> +2.4% จากสัปดาห์ก่อน
+                        </span>
+                    </div>
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                        <i data-lucide="badge-dollar-sign" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Low Stock Alert -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">วัสดุต้องสั่งเพิ่ม (Low Stock)</p>
+                        <h3 class="text-2xl font-bold text-rose-600 mt-1" id="lowStockCountText">5 รายการ</h3>
+                        <span class="text-xs text-rose-500 font-medium inline-flex items-center mt-1">
+                            <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> ต่ำกว่า Minimum Level
+                        </span>
+                    </div>
+                    <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                        <i data-lucide="alert-circle" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Daily Requisitions -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">เบิกใช้งานวันนี้</p>
+                        <h3 class="text-2xl font-bold text-slate-800 mt-1" id="todayUsageText">18 รายการ</h3>
+                        <span class="text-xs text-slate-500 font-medium inline-flex items-center mt-1">
+                            <i data-lucide="clock" class="w-3 h-3 mr-1"></i> อัปเดตล่าสุด 10 นาทีที่แล้ว
+                        </span>
+                    </div>
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                        <i data-lucide="truck" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Pending POs -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">รอรับเข้า (Pending PO)</p>
+                        <h3 class="text-2xl font-bold text-slate-800 mt-1">3 ใบสั่งซื้อ</h3>
+                        <span class="text-xs text-amber-600 font-medium inline-flex items-center mt-1">
+                            <i data-lucide="package-check" class="w-3 h-3 mr-1"></i> กำหนดส่งมอบสัปดาห์นี้
+                        </span>
+                    </div>
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                        <i data-lucide="shopping-cart" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Usage Trend Chart -->
+                <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-800">แนวโน้มการเบิกใช้ปูนและเหล็ก (7 วันล่าสุด)</h3>
+                            <p class="text-xs text-slate-500">เปรียบเทียบปริมาณการใช้วัสดุหลักประจำวัน</p>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-amber-500 mr-1"></span> ปูนซีเมนต์ (กระสอบ)</span>
+                            <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-1"></span> เหล็กเส้น (ตัน)</span>
+                        </div>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="usageChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Category Breakdown Chart -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-1">สัดส่วนมูลค่าวัสดุตามหมวดหมู่</h3>
+                        <p class="text-xs text-slate-500 mb-4">แบ่งตามประเภทงานก่อสร้าง</p>
+                        <div class="h-48 relative flex items-center justify-center">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 mt-4 border-t pt-3">
+                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-slate-800 mr-2"></span>โครงสร้าง (45%)</div>
+                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span>งานสถาปัตย์ (25%)</div>
+                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2"></span>งานระบบ (20%)</div>
+                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>เครื่องมือ/ทั่วไป (10%)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Data Table Section -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <!-- Table Controls -->
+                <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg">รายการวัสดุก่อสร้างในคลัง</h3>
+                        <p class="text-xs text-slate-500">ตรวจสอบจำนวนคงเหลือ จุดสั่งซื้อเติม และตำแหน่งจัดเก็บ</p>
+                    </div>
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <div class="relative flex-1 sm:w-64">
+                            <input type="text" id="searchInput" onkeyup="renderInventoryTable()" placeholder="ค้นหาชื่อวัสดุ, รหัส..." class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:ring-amber-500 focus:border-amber-500">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                        </div>
+                        <select id="categoryFilter" onchange="renderInventoryTable()" class="border border-slate-300 rounded-xl text-sm py-2 px-3 text-slate-700 focus:ring-amber-500 focus:border-amber-500">
+                            <option value="all">ทุกหมวดหมู่</option>
+                            <option value="โครงสร้าง">งานโครงสร้าง</option>
+                            <option value="สถาปัตยกรรม">งานสถาปัตยกรรม</option>
+                            <option value="งานระบบ">งานระบบ</option>
+                            <option value="เครื่องมือ">เครื่องมือ/อุปกรณ์</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table Content -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
+                            <tr>
+                                <th class="py-3.5 px-4">รหัสวัสดุ</th>
+                                <th class="py-3.5 px-4">รายการวัสดุ</th>
+                                <th class="py-3.5 px-4">หมวดหมู่</th>
+                                <th class="py-3.5 px-4 text-right">คงเหลือ</th>
+                                <th class="py-3.5 px-4 text-right">ขั้นต่ำ (Safety)</th>
+                                <th class="py-3.5 px-4">หน่วยนับ</th>
+                                <th class="py-3.5 px-4 text-center">สถานะสต็อก</th>
+                                <th class="py-3.5 px-4">จุดจัดเก็บ</th>
+                                <th class="py-3.5 px-4 text-center">การจัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody" class="divide-y divide-slate-200">
+                            <!-- Rendered by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Footer / Pagination -->
+                <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                    <span>แสดง <span id="displayedCount">0</span> จากทั้งหมด <span id="totalCount">0</span> รายการ</span>
+                    <div class="flex space-x-1">
+                        <button class="px-3 py-1 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-50">ก่อนหน้า</button>
+                        <button class="px-3 py-1 bg-white border border-slate-300 rounded-lg hover:bg-slate-100">ถัดไป</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Form: Add / Dispense Material Transaction -->
+    <div id="transactionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-fade-in">
+            <button onclick="closeTransactionModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            
+            <div class="flex items-center space-x-3 mb-5">
+                <div id="modalIconContainer" class="p-2.5 rounded-xl bg-amber-100 text-amber-700">
+                    <i id="modalIcon" data-lucide="minus-circle" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 id="modalTitle" class="text-lg font-bold text-slate-800">บันทึกการเบิกจ่ายวัสดุ</h3>
+                    <p class="text-xs text-slate-500">ลงบันทึกการนำวัสดุออกจากคลังเพื่อไปใช้งาน</p>
+                </div>
+            </div>
+
+            <form id="transactionForm" onsubmit="handleTransactionSubmit(event)" class="space-y-4">
+                <input type="hidden" id="transType" value="out">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">เลือกรายการวัสดุ</label>
+                    <select id="transItem" required class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                        <!-- Options filled by JS -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">จำนวน</label>
+                        <input type="number" id="transQty" min="1" required placeholder="0" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">เลขที่เอกสาร / ใบเบิก</label>
+                        <input type="text" id="transDoc" required placeholder="REQ-XXXX" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">ผู้เบิก / ผู้รับผิดชอบ</label>
+                    <input type="text" id="transPerson" required placeholder="ระบุชื่อช่าง หรือ โฟร์แมน" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุ / นำไปใช้ส่วนใด</label>
+                    <textarea id="transNote" rows="2" placeholder="เช่น เทพื้นชั้น 2, เดินสายไฟโซน A" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500"></textarea>
+                </div>
+
+                <div class="pt-3 flex justify-end space-x-3">
+                    <button type="button" onclick="closeTransactionModal()" class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">ยกเลิก</button>
+                    <button type="submit" id="submitBtn" class="px-5 py-2.5 text-sm font-semibold text-slate-950 bg-amber-500 hover:bg-amber-600 rounded-xl shadow-md transition">บันทึกรายการ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl hidden items-center space-x-3 z-50 border border-slate-700">
+        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+        <span id="toastMessage" class="text-sm">บันทึกข้อมูลเรียบร้อยแล้ว</span>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Mock Data for Inventory Items
+        let inventoryData = [
+            { id: "MAT-001", name: "ปูนซีเมนต์ปอร์ตแลนด์ (ตราช้าง)", category: "โครงสร้าง", qty: 120, min: 200, unit: "ถุง", location: "โกดัง A-1", project: "p1" },
+            { id: "MAT-002", name: "เหล็กเส้นข้ออ้อย DB16 มม.", category: "โครงสร้าง", qty: 15, min: 10, unit: "ตัน", location: "ลานเหล็ก B", project: "p1" },
+            { id: "MAT-003", name: "อิฐมวลเบา 7.5 ซม.", category: "สถาปัตยกรรม", qty: 3500, min: 1000, unit: "ก้อน", location: "โกดัง C-2", project: "p2" },
+            { id: "MAT-004", name: "สายไฟฟ้า THW 1x2.5 ตร.มม.", category: "งานระบบ", qty: 8, min: 15, unit: "ม้วน", location: "ห้องสโตร์ E", project: "p2" },
+            { id: "MAT-005", name: "ท่อ PVC ตราช้าง 3/4 นิ้ว (ชั้น 8.5)", category: "งานระบบ", qty: 120, min: 50, unit: "เส้น", location: "โกดัง B-3", project: "p3" },
+            { id: "MAT-006", name: "สีรองพื้นปูนเก่า TOA Quick Primer", category: "สถาปัตยกรรม", qty: 5, min: 12, unit: "ถัง", location: "ห้องเคมี D", project: "p1" },
+            { id: "MAT-007", name: "นั่งร้านเหล็กมาตรฐาน 1.7 ม.", category: "เครื่องมือ", qty: 85, min: 30, unit: "ชุด", location: "ลานอุปกรณ์ C", project: "p3" },
+            { id: "MAT-008", name: "แผ่นยิปซัมบอร์ด 12 มม.", category: "สถาปัตยกรรม", qty: 40, min: 100, unit: "แผ่น", location: "โกดัง A-3", project: "p2" },
+            { id: "MAT-009", name: "ลวดผูกเหล็ก เบอร์ 18", category: "โครงสร้าง", qty: 180, min: 50, unit: "กก.", location: "ห้องสโตร์ E", project: "p1" },
+            { id: "MAT-010", name: "สว่านกระแทกไร้สาย 18V", category: "เครื่องมือ", qty: 12, min: 5, unit: "เครื่อง", location: "ห้องเครื่องมือ M", project: "p3" }
+        ];
+
+        let usageChartInstance = null;
+        let categoryChartInstance = null;
+
+        // Initialize App on DOM Load
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            renderInventoryTable();
+            initCharts();
+            updateKPIs();
+        });
+
+        // Filter Data by Selected Project
+        function filterProjectData() {
+            renderInventoryTable();
+            updateKPIs();
+        }
+
+        // Render Inventory Table
+        function renderInventoryTable() {
+            const tbody = document.getElementById("inventoryTableBody");
+            const selectedProject = document.getElementById("projectFilter").value;
+            const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+            const selectedCategory = document.getElementById("categoryFilter").value;
+
+            tbody.innerHTML = "";
+
+            let filtered = inventoryData.filter(item => {
+                const matchProject = selectedProject === "all" || item.project === selectedProject;
+                const matchSearch = item.name.toLowerCase().includes(searchTerm) || item.id.toLowerCase().includes(searchTerm);
+                const matchCat = selectedCategory === "all" || item.category === selectedCategory;
+                return matchProject && matchSearch && matchCat;
+            });
+
+            document.getElementById("displayedCount").innerText = filtered.length;
+            document.getElementById("totalCount").innerText = inventoryData.length;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400">ไม่พบรายการวัสดุตรงตามเงื่อนไข</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const isLow = item.qty <= item.min;
+                const statusBadge = isLow 
+                    ? `<span class="bg-rose-100 text-rose-700 text-xs px-2.5 py-1 rounded-full font-semibold inline-flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>สต็อกต่ำ</span>`
+                    : `<span class="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-semibold inline-flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>ปกติ</span>`;
+
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-500">${item.id}</td>
+                    <td class="py-3.5 px-4 font-medium text-slate-900">${item.name}</td>
+                    <td class="py-3.5 px-4 text-xs"><span class="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">${item.category}</span></td>
+                    <td class="py-3.5 px-4 text-right font-bold ${isLow ? 'text-rose-600' : 'text-slate-800'}">${item.qty.toLocaleString()}</td>
+                    <td class="py-3.5 px-4 text-right text-slate-400">${item.min.toLocaleString()}</td>
+                    <td class="py-3.5 px-4 text-xs text-slate-500">${item.unit}</td>
+                    <td class="py-3.5 px-4 text-center">${statusBadge}</td>
+                    <td class="py-3.5 px-4 text-xs text-slate-500">${item.location}</td>
+                    <td class="py-3.5 px-4 text-center">
+                        <button onclick="quickAction('${item.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-medium transition">
+                            ปรับสต็อก
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Update Summary KPI Cards
+        function updateKPIs() {
+            const selectedProject = document.getElementById("projectFilter").value;
+            const items = selectedProject === "all" ? inventoryData : inventoryData.filter(i => i.project === selectedProject);
+            
+            const lowCount = items.filter(i => i.qty <= i.min).length;
+            document.getElementById("lowStockCountText").innerText = `${lowCount} รายการ`;
+
+            // Dynamic mock calculation based on count
+            const baseValue = selectedProject === "all" ? 4250800 : (selectedProject === "p1" ? 1850000 : (selectedProject === "p2" ? 1400000 : 1000800));
+            document.getElementById("totalValueText").innerText = `฿${baseValue.toLocaleString()}`;
+        }
+
+        // Open Dispense / Receive Transaction Modal
+        function openTransactionModal(type) {
+            const modal = document.getElementById("transactionModal");
+            const title = document.getElementById("modalTitle");
+            const iconContainer = document.getElementById("modalIconContainer");
+            const icon = document.getElementById("modalIcon");
+            const submitBtn = document.getElementById("submitBtn");
+            const transType = document.getElementById("transType");
+
+            transType.value = type;
+
+            if (type === 'out') {
+                title.innerText = "บันทึกการเบิกจ่ายวัสดุ";
+                iconContainer.className = "p-2.5 rounded-xl bg-amber-100 text-amber-700";
+                icon.setAttribute("data-lucide", "minus-circle");
+                submitBtn.className = "px-5 py-2.5 text-sm font-semibold text-slate-950 bg-amber-500 hover:bg-amber-600 rounded-xl shadow-md transition";
+                submitBtn.innerText = "บันทึกการเบิก";
+            } else {
+                title.innerText = "บันทึกรับเข้าวัสดุสินค้า";
+                iconContainer.className = "p-2.5 rounded-xl bg-emerald-100 text-emerald-700";
+                icon.setAttribute("data-lucide", "plus-circle");
+                submitBtn.className = "px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition";
+                submitBtn.innerText = "บันทึกการรับเข้า";
+            }
+
+            // Populate Material Select Options
+            const itemSelect = document.getElementById("transItem");
+            itemSelect.innerHTML = "";
+            inventoryData.forEach(item => {
+                const opt = document.createElement("option");
+                opt.value = item.id;
+                opt.innerText = `[${item.id}] ${item.name} (คงเหลือ: ${item.qty} ${item.unit})`;
+                itemSelect.appendChild(opt);
+            });
+
+            lucide.createIcons();
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+        }
+
+        function closeTransactionModal() {
+            const modal = document.getElementById("transactionModal");
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+            document.getElementById("transactionForm").reset();
+        }
+
+        function quickAction(itemId) {
+            openTransactionModal('out');
+            document.getElementById("transItem").value = itemId;
+        }
+
+        // Handle Form Submission
+        function handleTransactionSubmit(e) {
+            e.preventDefault();
+            const type = document.getElementById("transType").value;
+            const itemId = document.getElementById("transItem").value;
+            const qty = parseInt(document.getElementById("transQty").value);
+
+            const item = inventoryData.find(i => i.id === itemId);
+            if (item) {
+                if (type === 'out') {
+                    if (item.qty < qty) {
+                        alert("จำนวนสินค้าคงเหลือไม่พอสำหรับการเบิกจ่าย!");
+                        return;
+                    }
+                    item.qty -= qty;
+                    showToast(`เบิกสินค้า ${item.name} จำนวน ${qty} ${item.unit} เรียบร้อยแล้ว`);
+                } else {
+                    item.qty += qty;
+                    showToast(`รับสินค้าเข้า ${item.name} จำนวน ${qty} ${item.unit} เรียบร้อยแล้ว`);
+                }
+            }
+
+            renderInventoryTable();
+            updateKPIs();
+            closeTransactionModal();
+        }
+
+        // Toast Notification
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            document.getElementById("toastMessage").innerText = msg;
+            toast.classList.remove("hidden");
+            toast.classList.add("flex");
+            setTimeout(() => {
+                toast.classList.add("hidden");
+                toast.classList.remove("flex");
+            }, 3500);
+        }
+
+        // Initialize Chart.js
+        function initCharts() {
+            // Usage Trend Line Chart
+            const ctx1 = document.getElementById('usageChart').getContext('2d');
+            usageChartInstance = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'],
+                    datasets: [
+                        {
+                            label: 'ปูนซีเมนต์ (ถุง)',
+                            data: [120, 190, 300, 250, 220, 130, 80],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'เหล็กเส้น (ตัน)',
+                            data: [12, 18, 15, 25, 20, 10, 5],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Category Doughnut Chart
+            const ctx2 = document.getElementById('categoryChart').getContext('2d');
+            categoryChartInstance = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['โครงสร้าง', 'สถาปัตยกรรม', 'งานระบบ', 'เครื่องมือ'],
+                    datasets: [{
+                        data: [45, 25, 20, 10],
+                        backgroundColor: ['#0f172a', '#f59e0b', '#3b82f6', '#10b981'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '70%'
+                }
+            });
+        }
+    </script>
+</body>
+</html>
