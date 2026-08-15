@@ -3,43 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบจัดการคลังสินค้าและวัสดุก่อสร้าง (Construction Inventory)</title>
+    <title>BuildStock Pro - ระบบจัดการสต็อกและมูลค่าวัสดุ/โครงการ TWS</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
+    <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Google Fonts: Prompt -->
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Prompt', sans-serif;
-            background-color: #f8fafc;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .project-card-active { border-color: #f59e0b !important; background-color: #fffbeb !important; box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.15); }
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col md:flex-row">
 
     <!-- Sidebar Navigation -->
-    <aside class="w-full md:w-64 bg-slate-900 text-white flex-shrink-0">
-        <div class="p-5 flex items-center justify-between border-b border-slate-800">
-            <div class="flex items-center space-x-3">
-                <div class="bg-amber-500 p-2 rounded-lg text-slate-900">
+    <aside class="w-full md:w-64 bg-[#0f172a] text-white flex-shrink-0 flex flex-col justify-between">
+        <div>
+            <!-- Brand Logo -->
+            <div class="p-5 flex items-center space-x-3 border-b border-slate-800">
+                <div class="bg-amber-500 p-2 rounded-xl text-slate-950 shadow-sm">
                     <i data-lucide="hard-hat" class="w-6 h-6"></i>
                 </div>
                 <div>
@@ -47,42 +35,96 @@
                     <p class="text-xs text-slate-400">ระบบคลังสินค้าก่อสร้าง</p>
                 </div>
             </div>
-        </div>
-        
-        <nav class="p-4 space-y-1">
-            <a href="#" class="flex items-center space-x-3 px-4 py-3 bg-amber-500 text-slate-950 font-medium rounded-xl transition">
-                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                <span>แดชบอร์ดหลัก</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
-                <i data-lucide="boxes" class="w-5 h-5"></i>
-                <span>รายการวัสดุอุปกรณ์</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
-                <i data-lucide="arrow-up-right-from-circle" class="w-5 h-5"></i>
-                <span>การเบิกจ่ายวัสดุ</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
-                <i data-lucide="arrow-down-left-to-circle" class="w-5 h-5"></i>
-                <span>รับเข้าวัสดุ / สั่งซื้อ</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
-                <i data-lucide="building-2" class="w-5 h-5"></i>
-                <span>โครงการก่อสร้าง</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition">
-                <i data-lucide="file-text" class="w-5 h-5"></i>
-                <span>รายงานสต็อก</span>
-            </a>
-        </nav>
+            
+            <!-- Menu Navigation -->
+            <nav class="p-4 space-y-1.5">
+                <button onclick="switchView('dashboard')" id="nav-dashboard" class="w-full flex items-center space-x-3 px-4 py-3 bg-amber-500 text-slate-950 font-semibold rounded-xl transition text-left">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 flex-shrink-0"></i>
+                    <span>แดชบอร์ดหลัก</span>
+                </button>
+                
+                <button onclick="switchView('inventory')" id="nav-inventory" class="w-full flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition text-left">
+                    <i data-lucide="boxes" class="w-5 h-5 flex-shrink-0"></i>
+                    <span>รายการวัสดุอุปกรณ์</span>
+                </button>
 
-        <div class="p-4 mt-auto border-t border-slate-800">
-            <div class="bg-slate-800 p-3 rounded-xl flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center font-bold text-slate-950">
+                <!-- หัวข้อหลัก 1: การเบิกจ่ายวัสดุ -->
+                <div>
+                    <button onclick="toggleTransactionSubmenu()" class="w-full flex items-center justify-between px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition text-left">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="arrow-left-right" class="w-5 h-5 text-amber-500 flex-shrink-0"></i>
+                            <span class="font-medium text-slate-200">การเบิกจ่ายวัสดุ</span>
+                        </div>
+                        <i data-lucide="chevron-down" id="transSubmenuIcon" class="w-4 h-4 text-slate-400 transition-transform duration-200"></i>
+                    </button>
+                    
+                    <div id="transSubmenu" class="pl-9 pr-2 pt-1 pb-1 space-y-1">
+                        <button onclick="switchView('trans-out')" id="nav-trans-out" class="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 rounded-lg transition text-left">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            <span>1. เบิกจ่ายวัสดุ</span>
+                        </button>
+                        <button onclick="switchView('trans-in')" id="nav-trans-in" class="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-emerald-400 hover:bg-slate-800/60 rounded-lg transition text-left">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>2. รับเข้าวัสดุ / สั่งซื้อ</span>
+                        </button>
+                        <button onclick="switchView('trans-adj')" id="nav-trans-adj" class="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-blue-400 hover:bg-slate-800/60 rounded-lg transition text-left">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <span>3. ปรับปรุงเพิ่ม / ลด</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- เมนู: รออนุมัติ -->
+                <button onclick="switchView('approvals')" id="nav-approvals" class="w-full flex items-center justify-between px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition text-left">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="check-square" class="w-5 h-5 flex-shrink-0"></i>
+                        <span>รออนุมัติ</span>
+                    </div>
+                    <span id="pendingBadge" class="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">2</span>
+                </button>
+                
+                <!-- เมนู: มูลค่าวัสดุ/โครงการ -->
+                <button onclick="switchView('projects')" id="nav-projects" class="w-full flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition text-left">
+                    <i data-lucide="badge-dollar-sign" class="w-5 h-5 flex-shrink-0"></i>
+                    <span>มูลค่าวัสดุ/โครงการ</span>
+                </button>
+
+                <!-- หัวข้อหลัก 2: สรุปรายงาน -->
+                <div>
+                    <button onclick="toggleReportSubmenu()" class="w-full flex items-center justify-between px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition text-left">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="file-text" class="w-5 h-5 text-amber-500 flex-shrink-0"></i>
+                            <span class="font-medium text-slate-200">สรุปรายงาน</span>
+                        </div>
+                        <i data-lucide="chevron-down" id="reportSubmenuIcon" class="w-4 h-4 text-slate-400 transition-transform duration-200"></i>
+                    </button>
+                    
+                    <div id="reportSubmenu" class="pl-9 pr-2 pt-1 pb-1 space-y-1">
+                        <button onclick="switchView('rep-out')" id="nav-rep-out" class="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 rounded-lg transition text-left">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            <span>1. สรุปรายงานการเบิกจ่าย</span>
+                        </button>
+                        <button onclick="switchView('rep-in')" id="nav-rep-in" class="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-emerald-400 hover:bg-slate-800/60 rounded-lg transition text-left">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>2. สรุปรายงานการรับเข้า</span>
+                        </button>
+                        <button onclick="switchView('rep-overview')" id="nav-rep-overview" class="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-blue-400 hover:bg-slate-800/60 rounded-lg transition text-left">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <span>3. ภาพรวมบริษัท</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </div>
+
+        <!-- User Profile Card -->
+        <div class="p-4 border-t border-slate-800">
+            <div class="bg-slate-800/80 p-3 rounded-xl flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center font-bold text-slate-950 text-base">
                     วิ
                 </div>
                 <div>
-                    <p class="text-sm font-semibold">วิศวกรสมชาย</p>
+                    <p class="text-sm font-semibold text-white">วิศวกรสมชาย</p>
                     <p class="text-xs text-slate-400">ผู้จัดการคลังสินค้า</p>
                 </div>
             </div>
@@ -92,560 +134,822 @@
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
         
-        <!-- Header -->
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-10 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <!-- Header Top Bar -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-20 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-                <h2 class="text-2xl font-bold text-slate-800">ภาพรวมคลังสินค้าก่อสร้าง</h2>
-                <p class="text-sm text-slate-500">ติดตามสถานะวัสดุ ปริมาณคงเหลือ และการเบิกจ่ายประจำวัน</p>
+                <h2 id="topBarTitle" class="text-2xl font-bold text-slate-800">ภาพรวมคลังสินค้าก่อสร้าง</h2>
+                <p id="topBarSubtitle" class="text-sm text-slate-500">ติดตามสถานะวัสดุ ปริมาณคงเหลือ และการเบิกจ่ายประจำวัน</p>
             </div>
 
-            <!-- Site / Project Selector & Action Buttons -->
             <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <div class="relative flex-1 sm:flex-none">
-                    <select id="projectFilter" onchange="filterProjectData()" class="w-full bg-slate-100 border border-slate-300 text-slate-700 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-2.5 pr-8 appearance-none font-medium cursor-pointer">
-                        <option value="all">ทุกโครงการ (รวมทั้งหมด)</option>
-                        <option value="สโตร์กลาง">สโตร์กลาง</option>
-                        <option value="ทวีวงษ์ New factory">ทวีวงษ์ New factory</option>
-                        <option value="บุญพา">บุญพา</option>
-                        <option value="KVG อาคารเก็บสินค้า">KVG อาคารเก็บสินค้า</option>
+                    <select id="siteFilter" onchange="syncSiteFilter(this.value)" class="w-full bg-slate-100 border border-slate-300 text-slate-700 text-sm rounded-xl focus:ring-amber-500 p-2.5 pr-8 font-medium cursor-pointer">
+                        <option value="all">🌐 ทุกโครงการ (รวมทั้งหมด)</option>
+                        <option value="ทวีวงษ์ New factory" selected>🏗️ โครงการ: ทวีวงษ์ New factory</option>
+                        <option value="สโตร์กลาง">🏢 สโตร์กลาง</option>
+                        <option value="บุญพา">🏗️ โครงการ: บุญพา</option>
+                        <option value="บ้านคุณบี">🏡 โครงการ: บ้านคุณบี</option>
+                        <option value="บ้านคุณอรรถา">🏡 โครงการ: บ้านคุณอรรถา</option>
+                        <option value="ศิริชัย">🏗️ โครงการ: ศิริชัย</option>
+                        <option value="KVG อาคารเก็บสินค้า">🏬 โครงการ: KVG อาคารเก็บสินค้า</option>
                     </select>
-                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-2.5 top-3.5 pointer-events-none"></i>
                 </div>
 
                 <button onclick="openTransactionModal('out')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm transition">
                     <i data-lucide="minus-circle" class="w-4 h-4"></i>
                     <span>เบิกวัสดุ</span>
                 </button>
-                <button onclick="openTransactionModal('in')" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm transition">
+                <button onclick="openTransactionModal('in')" class="bg-[#0f172a] hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm transition">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
                     <span>รับสินค้าเข้า</span>
                 </button>
             </div>
         </header>
 
-        <!-- Dashboard Content Container -->
-        <div class="p-6 space-y-6">
-
-            <!-- KPI Cards Section -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                
-                <!-- Total Valuation -->
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <!-- VIEW 1: Dashboard Main View -->
+        <div id="view-dashboard" class="p-6 space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 p-5 rounded-2xl text-white shadow-sm flex flex-col justify-between">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">มูลค่าสต็อกรวม</p>
-                        <h3 class="text-2xl font-bold text-slate-800 mt-1" id="totalValueText">฿4,250,800</h3>
-                        <span class="text-xs text-emerald-600 font-medium inline-flex items-center mt-1">
-                            <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i> +2.4% จากสัปดาห์ก่อน
-                        </span>
-                    </div>
-                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                        <i data-lucide="badge-dollar-sign" class="w-6 h-6"></i>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-amber-400">มูลค่าวัสดุรับเข้ารวม</p>
+                        <h3 class="text-xl font-bold mt-2" id="card-proj-val">฿10,050,000</h3>
+                        <p class="text-[11px] text-slate-300 mt-1" id="card-proj-name">ทวีวงษ์ New factory</p>
                     </div>
                 </div>
-
-                <!-- Low Stock Alert -->
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">วัสดุต้องสั่งเพิ่ม (Low Stock)</p>
-                        <h3 class="text-2xl font-bold text-rose-600 mt-1" id="lowStockCountText">5 รายการ</h3>
-                        <span class="text-xs text-rose-500 font-medium inline-flex items-center mt-1">
-                            <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> ต่ำกว่า Minimum Level
-                        </span>
-                    </div>
-                    <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                        <i data-lucide="alert-circle" class="w-6 h-6"></i>
-                    </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">มูลค่าคงเหลือในไซต์</p>
+                    <h3 class="text-xl font-bold text-slate-800 mt-1" id="card-stock-val">฿1,850,000</h3>
                 </div>
-
-                <!-- Daily Requisitions -->
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">เบิกใช้งานวันนี้</p>
-                        <h3 class="text-2xl font-bold text-slate-800 mt-1" id="todayUsageText">18 รายการ</h3>
-                        <span class="text-xs text-slate-500 font-medium inline-flex items-center mt-1">
-                            <i data-lucide="clock" class="w-3 h-3 mr-1"></i> อัปเดตล่าสุด 10 นาทีที่แล้ว
-                        </span>
-                    </div>
-                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
-                        <i data-lucide="truck" class="w-6 h-6"></i>
-                    </div>
+                <div class="bg-white p-5 rounded-2xl border-2 border-rose-200 bg-rose-50/20 shadow-sm">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-rose-600">ต้องสั่งเพิ่ม (LOW STOCK)</p>
+                    <h3 class="text-xl font-bold text-rose-700 mt-1" id="card-low-stock">0 รายการ</h3>
                 </div>
-
-                <!-- Pending POs -->
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">รอรับเข้า (Pending PO)</p>
-                        <h3 class="text-2xl font-bold text-slate-800 mt-1">3 ใบสั่งซื้อ</h3>
-                        <span class="text-xs text-amber-600 font-medium inline-flex items-center mt-1">
-                            <i data-lucide="package-check" class="w-3 h-3 mr-1"></i> กำหนดส่งมอบสัปดาห์นี้
-                        </span>
-                    </div>
-                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                        <i data-lucide="shopping-cart" class="w-6 h-6"></i>
-                    </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">เบิกใช้งานวันนี้</p>
+                    <h3 class="text-xl font-bold text-slate-800 mt-1">18 รายการ</h3>
                 </div>
-
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:bg-slate-50 transition" onclick="switchView('approvals')">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">รออนุมัติ (PENDING)</p>
+                    <h3 class="text-xl font-bold text-amber-600 mt-1" id="card-pending-count">2 รายการ</h3>
+                </div>
             </div>
 
             <!-- Charts Section -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Usage Trend Chart -->
                 <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 class="font-bold text-slate-800">แนวโน้มการเบิกใช้ปูนและเหล็ก (7 วันล่าสุด)</h3>
-                            <p class="text-xs text-slate-500">เปรียบเทียบปริมาณการใช้วัสดุหลักประจำวัน</p>
-                        </div>
-                        <div class="flex items-center space-x-2 text-xs">
-                            <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-amber-500 mr-1"></span> ปูนซีเมนต์ (กระสอบ)</span>
-                            <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-1"></span> เหล็กเส้น (ตัน)</span>
-                        </div>
-                    </div>
-                    <div class="h-64 relative">
-                        <canvas id="usageChart"></canvas>
-                    </div>
+                    <h3 class="font-bold text-slate-800 mb-2">แนวโน้มการเบิกใช้ปูนและเหล็ก (7 วันล่าสุด)</h3>
+                    <div class="h-64 relative"><canvas id="usageTrendChart"></canvas></div>
                 </div>
-
-                <!-- Category Breakdown Chart -->
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <h3 class="font-bold text-slate-800 mb-1">สัดส่วนมูลค่าวัสดุตามหมวดหมู่</h3>
-                        <p class="text-xs text-slate-500 mb-4">แบ่งตามประเภทงานก่อสร้าง</p>
-                        <div class="h-48 relative flex items-center justify-center">
-                            <canvas id="categoryChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 mt-4 border-t pt-3">
-                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-slate-800 mr-2"></span>โครงสร้าง (45%)</div>
-                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span>งานสถาปัตย์ (25%)</div>
-                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2"></span>งานระบบ (20%)</div>
-                        <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>เครื่องมือ/ทั่วไป (10%)</div>
-                    </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-2">สัดส่วนมูลค่าวัสดุตามหมวดหมู่</h3>
+                    <div class="h-48 relative flex items-center justify-center"><canvas id="categoryPieChart"></canvas></div>
                 </div>
             </div>
 
-            <!-- Inventory Data Table Section -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <!-- Table Controls -->
-                <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-lg">รายการวัสดุก่อสร้างในคลัง</h3>
-                        <p class="text-xs text-slate-500">ตรวจสอบจำนวนคงเหลือ จุดสั่งซื้อเติม และตำแหน่งจัดเก็บ</p>
-                    </div>
-                    <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <div class="relative flex-1 sm:w-64">
-                            <input type="text" id="searchInput" onkeyup="renderInventoryTable()" placeholder="ค้นหาชื่อวัสดุ, รหัส..." class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:ring-amber-500 focus:border-amber-500">
-                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+            <!-- Low Stock Alert Table -->
+            <div class="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-rose-100 bg-rose-50/40 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-rose-600 text-white rounded-xl"><i data-lucide="shield-alert" class="w-5 h-5"></i></div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg">รายการวัสดุที่ต้องสั่งซื้อเพิ่มเร่งด่วน (Low Stock Alert)</h3>
+                            <span id="lowStockTableBadge" class="bg-rose-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">0 รายการ</span>
                         </div>
-                        <select id="categoryFilter" onchange="renderInventoryTable()" class="border border-slate-300 rounded-xl text-sm py-2 px-3 text-slate-700 focus:ring-amber-500 focus:border-amber-500">
-                            <option value="all">ทุกหมวดหมู่</option>
-                            <option value="โครงสร้าง">งานโครงสร้าง</option>
-                            <option value="สถาปัตยกรรม">งานสถาปัตยกรรม</option>
-                            <option value="งานระบบ">งานระบบ</option>
-                            <option value="เครื่องมือ">เครื่องมือ/อุปกรณ์</option>
-                        </select>
                     </div>
                 </div>
-
-                <!-- Table Content -->
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-slate-600">
-                        <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
+                        <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-xs border-b">
                             <tr>
                                 <th class="py-3.5 px-4">รหัสวัสดุ</th>
                                 <th class="py-3.5 px-4">รายการวัสดุ</th>
-                                <th class="py-3.5 px-4">หมวดหมู่</th>
-                                <th class="py-3.5 px-4 text-right">คงเหลือ</th>
-                                <th class="py-3.5 px-4 text-right">ขั้นต่ำ (Safety)</th>
-                                <th class="py-3.5 px-4">หน่วยนับ</th>
-                                <th class="py-3.5 px-4 text-center">สถานะสต็อก</th>
-                                <th class="py-3.5 px-4">จุดจัดเก็บ</th>
-                                <th class="py-3.5 px-4 text-center">การจัดการ</th>
+                                <th class="py-3.5 px-4 text-right">คงเหลือในไซต์</th>
+                                <th class="py-3.5 px-4 text-right">จุด Safety</th>
+                                <th class="py-3.5 px-4 text-center">สถานะความเร่งด่วน</th>
                             </tr>
                         </thead>
-                        <tbody id="inventoryTableBody" class="divide-y divide-slate-200">
-                            <!-- Rendered by JavaScript -->
-                        </tbody>
+                        <tbody id="lowStockAlertTableBody" class="divide-y divide-slate-200"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
 
-                <!-- Table Footer / Pagination -->
-                <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-                    <span>แสดง <span id="displayedCount">0</span> จากทั้งหมด <span id="totalCount">0</span> รายการ</span>
-                    <div class="flex space-x-1">
-                        <button class="px-3 py-1 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-50">ก่อนหน้า</button>
-                        <button class="px-3 py-1 bg-white border border-slate-300 rounded-lg hover:bg-slate-100">ถัดไป</button>
+        <!-- VIEW 2: รายการวัสดุอุปกรณ์ -->
+        <div id="view-inventory" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-800 text-lg">รายการวัสดุก่อสร้างในคลัง</h3>
+                    <input type="text" id="searchInput" onkeyup="renderInventoryTable()" placeholder="🔍 ค้นหาชื่อวัสดุ..." class="border p-2 rounded-xl text-sm">
+                </div>
+                <div class="overflow-x-auto"><table class="w-full text-left text-sm"><tbody id="inventoryTableBody" class="divide-y"></tbody></table></div>
+            </div>
+        </div>
+
+        <!-- VIEW: มูลค่าวัสดุ/โครงการ (พร้อมการ์ดครบทุกโครงการ) -->
+        <div id="view-projects" class="p-6 space-y-6 hidden">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-slate-800 text-base">เลือกโครงการเพื่อดูรายละเอียดมูลค่าวัสดุ</h3>
+                </div>
+                <div id="projectCardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
+            </div>
+
+            <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-sm">
+                <h3 id="metricProjectName" class="text-xl font-bold text-white mb-3">🌐 รวมทุกโครงการ (ภาพรวมบริษัท)</h3>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700">
+                        <p class="text-xs text-slate-400">มูลค่าวัสดุรับเข้ารวม</p>
+                        <p id="metricTotalIn" class="text-lg font-bold text-white mt-1">฿22,750,800</p>
+                    </div>
+                    <div class="bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-800">
+                        <p class="text-xs text-emerald-400 font-semibold">มูลค่าคงเหลือในไซต์</p>
+                        <p id="metricStockVal" class="text-lg font-bold text-emerald-300 mt-1">฿4,250,800</p>
+                    </div>
+                    <div class="bg-amber-950/40 p-3.5 rounded-xl border border-amber-800">
+                        <p class="text-xs text-amber-400 font-semibold">มูลค่าเบิกใช้สะสม</p>
+                        <p id="metricUsedVal" class="text-lg font-bold text-amber-300 mt-1">฿18,500,000</p>
+                    </div>
+                    <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700">
+                        <p class="text-xs text-slate-400">รายการ Low Stock</p>
+                        <p id="metricLowCount" class="text-lg font-bold text-rose-400 mt-1">0 รายการ</p>
                     </div>
                 </div>
             </div>
 
-        </div>
-    </main>
-
-    <!-- Modal Form: Add / Dispense Material Transaction -->
-    <div id="transactionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-fade-in">
-            <button onclick="closeTransactionModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-            
-            <div class="flex items-center space-x-3 mb-5">
-                <div id="modalIconContainer" class="p-2.5 rounded-xl bg-amber-100 text-amber-700">
-                    <i id="modalIcon" data-lucide="minus-circle" class="w-6 h-6"></i>
+            <div id="projectDetailSection" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b bg-slate-50 flex items-center justify-between">
+                    <h4 class="font-bold text-slate-800 text-base">รายการวัสดุและมูลค่าคงเหลือ (แยกรายชิ้น)</h4>
                 </div>
-                <div>
-                    <h3 id="modalTitle" class="text-lg font-bold text-slate-800">บันทึกการเบิกจ่ายวัสดุ</h3>
-                    <p class="text-xs text-slate-500">ลงบันทึกการนำวัสดุออกจากคลังเพื่อไปใช้งาน</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-100 text-slate-700 uppercase font-semibold text-xs border-b">
+                            <tr>
+                                <th class="py-3.5 px-4">รหัสวัสดุ</th>
+                                <th class="py-3.5 px-4">รายการวัสดุ</th>
+                                <th class="py-3.5 px-4 text-right">คงเหลือในไซต์</th>
+                                <th class="py-3.5 px-4 text-right">ราคาต่อหน่วย</th>
+                                <th class="py-3.5 px-4 text-right font-bold text-emerald-700">มูลค่าคงเหลือรวม (฿)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectDrilldownTableBody" class="divide-y divide-slate-200"></tbody>
+                    </table>
                 </div>
             </div>
+        </div>
 
-            <form id="transactionForm" onsubmit="handleTransactionSubmit(event)" class="space-y-4">
-                <input type="hidden" id="transType" value="out">
-                
+        <!-- VIEW SUB-1: 1. เบิกจ่ายวัสดุ -->
+        <div id="view-trans-out" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6 flex items-center justify-between shadow-sm">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">เลือกรายการวัสดุ</label>
-                    <select id="transItem" required class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
-                        <!-- Options filled by JS -->
+                    <h3 class="text-xl font-bold text-slate-800">1. ประวัติการเบิกจ่ายวัสดุ</h3>
+                    <p class="text-xs text-slate-500">บันทึกรายการขอเบิกใช้วัสดุออกไปยังหน้างานก่อสร้างทุกโครงการ</p>
+                </div>
+                <button onclick="openTransactionModal('out')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2 rounded-xl text-sm font-bold shadow-sm">+ ขอเบิกวัสดุ</button>
+            </div>
+            <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-700 border-b">
+                        <tr>
+                            <th class="py-3 px-4">วันที่</th>
+                            <th class="py-3 px-4">เลขที่ใบเบิก</th>
+                            <th class="py-3 px-4">โครงการ</th>
+                            <th class="py-3 px-4">รายการวัสดุ</th>
+                            <th class="py-3 px-4 text-right">จำนวน</th>
+                            <th class="py-3 px-4">ผู้ขอเบิก</th>
+                            <th class="py-3 px-4 text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transOutTableBody" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW SUB-2: 2. รับเข้าวัสดุ / สั่งซื้อ -->
+        <div id="view-trans-in" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6 flex items-center justify-between shadow-sm">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">2. ประวัติการรับเข้าวัสดุ / สั่งซื้อ</h3>
+                    <p class="text-xs text-slate-500">บันทึกรายการสั่งซื้อและรับสินค้าเข้าคลัง/ไซต์งาน</p>
+                </div>
+                <button onclick="openTransactionModal('in')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">+ รับเข้าวัสดุ</button>
+            </div>
+            <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-700 border-b">
+                        <tr>
+                            <th class="py-3 px-4">วันที่</th>
+                            <th class="py-3 px-4">เลขที่ PO</th>
+                            <th class="py-3 px-4">โครงการ</th>
+                            <th class="py-3 px-4">รายการวัสดุ</th>
+                            <th class="py-3 px-4 text-right">จำนวน</th>
+                            <th class="py-3 px-4">ผู้จำหน่าย</th>
+                            <th class="py-3 px-4 text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transInTableBody" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW SUB-3: 3. ปรับปรุงเพิ่ม / ลด -->
+        <div id="view-trans-adj" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6 flex items-center justify-between shadow-sm">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">3. ประวัติการปรับปรุงยอดสต็อก</h3>
+                    <p class="text-xs text-slate-500">บันทึกรายการปรับยอดสต็อก เพิ่ม/ลด ชำรุด นับสต็อก</p>
+                </div>
+                <button onclick="openTransactionModal('adj')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">+ ปรับปรุงสต็อก</button>
+            </div>
+            <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-700 border-b">
+                        <tr>
+                            <th class="py-3 px-4">วันที่</th>
+                            <th class="py-3 px-4">เลขที่เอกสาร</th>
+                            <th class="py-3 px-4">ประเภท</th>
+                            <th class="py-3 px-4">โครงการ</th>
+                            <th class="py-3 px-4">รายการวัสดุ</th>
+                            <th class="py-3 px-4 text-right">จำนวน</th>
+                            <th class="py-3 px-4 text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transAdjTableBody" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW: รออนุมัติ -->
+        <div id="view-approvals" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6 flex items-center justify-between">
+                <h3 class="text-xl font-bold">ศูนย์พิจารณาอนุมัติรายการ</h3>
+                <span id="pendingSummaryBadge" class="bg-rose-500 text-white font-bold text-sm px-3 py-1 rounded-xl">2 รายการ</span>
+            </div>
+            <div class="bg-white rounded-2xl border overflow-hidden"><table class="w-full text-left text-sm"><tbody id="approvalTableBody" class="divide-y"></tbody></table></div>
+        </div>
+
+        <!-- VIEW: สรุปรายงาน 1, 2, 3 -->
+        <div id="view-rep-out" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6"><h3 class="text-xl font-bold">1. สรุปรายงานการเบิกจ่ายวัสดุ</h3><div class="h-64 mt-4 relative"><canvas id="disbursementMonthlyChart"></canvas></div></div>
+        </div>
+        <div id="view-rep-in" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6"><h3 class="text-xl font-bold">2. สรุปรายงานการรับเข้าวัสดุ</h3><div class="h-64 mt-4 relative"><canvas id="receivingMonthlyChart"></canvas></div></div>
+        </div>
+        <div id="view-rep-overview" class="p-6 space-y-6 hidden">
+            <div class="bg-white rounded-2xl border p-6"><h3 class="text-xl font-bold">3. ภาพรวมบริษัท</h3><div class="h-72 mt-4 relative"><canvas id="companyOverviewChart"></canvas></div></div>
+        </div>
+
+    </main>
+
+    <!-- Modal Form -->
+    <div id="transModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <h3 id="modalTitle" class="text-lg font-bold text-slate-800 mb-4">บันทึกการทำรายการ</h3>
+            
+            <form onsubmit="handleTransactionSubmit(event)" class="space-y-4">
+                <input type="hidden" id="formCurrentMode" value="out">
+                
+                <div id="adjTypeContainer" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">เลือกประเภทการปรับปรุงสต็อก *</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center justify-center p-2.5 border-2 border-emerald-500 bg-emerald-50 text-emerald-800 rounded-xl cursor-pointer font-semibold text-sm">
+                            <input type="radio" name="adjustAction" id="adjActionPlus" value="plus" checked class="mr-2 text-emerald-600"> ➕ ปรับเพิ่ม
+                        </label>
+                        <label class="flex items-center justify-center p-2.5 border-2 border-rose-500 bg-rose-50 text-rose-800 rounded-xl cursor-pointer font-semibold text-sm">
+                            <input type="radio" name="adjustAction" id="adjActionMinus" value="minus" class="mr-2 text-rose-600"> ➖ ปรับลด
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">โครงการ / ไซต์งาน *</label>
+                    <select id="modalSiteSelect" required class="w-full border p-2.5 text-sm rounded-xl">
+                        <option value="ทวีวงษ์ New factory">ทวีวงษ์ New factory</option>
+                        <option value="สโตร์กลาง">สโตร์กลาง</option>
+                        <option value="บุญพา">โครงการ บุญพา</option>
+                        <option value="บ้านคุณบี">โครงการ บ้านคุณบี</option>
+                        <option value="บ้านคุณอรรถา">โครงการ บ้านคุณอรรถา</option>
+                        <option value="ศิริชัย">โครงการ ศิริชัย</option>
+                        <option value="KVG อาคารเก็บสินค้า">KVG อาคารเก็บสินค้า</option>
                     </select>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-semibold text-slate-700">เลือกรายการวัสดุ *</label>
+                        <span id="liveStockBadge" class="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">คงเหลือ: 0</span>
+                    </div>
+                    <select id="modalItemSelect" required class="w-full border p-2.5 text-sm rounded-xl font-medium"></select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">จำนวน</label>
-                        <input type="number" id="transQty" min="1" required placeholder="0" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">จำนวน *</label>
+                        <input type="number" id="modalQty" min="1" required placeholder="0" class="w-full border p-2.5 text-sm rounded-xl font-bold">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">เลขที่เอกสาร / ใบเบิก</label>
-                        <input type="text" id="transDoc" required placeholder="REQ-XXXX" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">เลขที่เอกสาร *</label>
+                        <input type="text" id="modalDoc" required placeholder="REQ-XXXX" class="w-full border p-2.5 text-sm rounded-xl">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">ผู้เบิก / ผู้รับผิดชอบ</label>
-                    <input type="text" id="transPerson" required placeholder="ระบุชื่อช่าง หรือ โฟร์แมน" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">ผู้ขอเบิก / ผู้รับผิดชอบ *</label>
+                    <input type="text" id="modalPerson" required placeholder="ระบุชื่อช่าง หรือ โฟร์แมน" class="w-full border p-2.5 text-sm rounded-xl">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุ / นำไปใช้ส่วนใด</label>
-                    <textarea id="transNote" rows="2" placeholder="เช่น เทพื้นชั้น 2, เดินสายไฟโซน A" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-amber-500 focus:border-amber-500"></textarea>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุ *</label>
+                    <textarea id="modalNote" rows="2" required placeholder="ระบุรายละเอียด..." class="w-full border p-2.5 text-sm rounded-xl"></textarea>
                 </div>
 
-                <div class="pt-3 flex justify-end space-x-3">
-                    <button type="button" onclick="closeTransactionModal()" class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">ยกเลิก</button>
-                    <button type="submit" id="submitBtn" class="px-5 py-2.5 text-sm font-semibold text-slate-950 bg-amber-500 hover:bg-amber-600 rounded-xl shadow-md transition">บันทึกรายการ</button>
+                <div class="pt-3 flex justify-end space-x-2 border-t">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 rounded-xl text-sm">ยกเลิก</button>
+                    <button type="submit" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-sm font-bold">บันทึก</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl hidden items-center space-x-3 z-50 border border-slate-700">
+    <!-- Toast Alert -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl items-center space-x-3 z-50 hidden">
         <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
-        <span id="toastMessage" class="text-sm">บันทึกข้อมูลเรียบร้อยแล้ว</span>
+        <span id="toastMessage" class="text-sm">ทำรายการสำเร็จ</span>
     </div>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript Engine -->
     <script>
-        
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwDsohE2dhbbW_g8fS1p1k0XqHVg6SEyBkbdSoIFNcHok40xIKj9sSmpM0DkI9j4RNC/exec";
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyy1_PA_2GiM7V2qe19gYekki9AQIVRyJkK-vKETor0i1VG5LNE25R8DpjG_QktVxmxHQ/exec"; 
 
+        let currentDrilldownSite = "all";
         let inventoryData = [];
-        let usageChartInstance = null;
-        let categoryChartInstance = null;
+        let materialProjectData = {};
+        let transactionsDatabase = [];
 
-        // Initialize App on DOM Load
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
-            initCharts();
-            fetchDataFromAPI(); // เรียกใช้ฟังก์ชันดึงข้อมูลจาก Google Sheets
+            fetchSheetData(); // โหลดข้อมูลจริงแทน Mock Data
         });
 
-        // ฟังก์ชันดึงข้อมูล (GET)
-        async function fetchDataFromAPI() {
-            const tableBody = document.getElementById("inventoryTableBody");
-            tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500"><div class="flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> กำลังโหลดข้อมูล...</div></td></tr>`;
+        // 1. ฟังก์ชันโหลดข้อมูลหลัก (ผ่าน Serverless GET)
+        async function fetchSheetData() {
+            const loaderHTML = `<tr><td colspan="7" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูลแบบ Real-time...</p></td></tr>`;
+            ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.innerHTML = loaderHTML;
+            });
             lucide.createIcons();
 
             try {
-                const response = await fetch(WEB_APP_URL);
+                const response = await fetch(WEB_APP_URL + "?t=" + new Date().getTime());
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    // แปลงชื่อ Field ให้ตรงกับที่ UI เรียกใช้
-                    inventoryData = result.data.map(item => ({
-                        id: item.Material_ID,
-                        name: item.Material_Name,
-                        category: item.Category,
-                        qty: parseFloat(item.Current_Qty) || 0,
-                        min: parseFloat(item.Safety_Stock) || 0,
-                        unit: item.Unit,
-                        location: item.Location_Project,
-                        project: item.Location_Project 
-                    }));
+                    // 1. แปลง Data ให้เข้ากับโครงสร้าง Nested Object เดิมของ UI
+                    let rawSheetData = {};
+                    result.inventory.forEach(row => {
+                        let code = String(row.Material_ID).trim();
+                        if (!rawSheetData[code]) {
+                            rawSheetData[code] = { code: code, name: row.Material_Name, unit: row.Unit, stocks: {} };
+                        }
+                        rawSheetData[code].stocks[row.Location_Project] = parseFloat(row.Current_Qty) || 0;
+                    });
                     
-                    renderInventoryTable();
-                    updateKPIs();
+                    // 2. แปลง Transactions
+                    transactionsDatabase = result.transactions.map(t => {
+                        let mode = "out";
+                        if (t.Type === "IN") mode = "in";
+                        else if (t.Type.includes("ADJ")) mode = "adj";
+
+                        return {
+                            id: t.Transaction_ID,
+                            mode: mode,
+                            typeRaw: t.Type,
+                            date: t.Timestamp.split(' ')[0],
+                            site: t.Project_Ref,
+                            itemId: t.Material_ID,
+                            itemName: rawSheetData[t.Material_ID]?.name || t.Material_ID,
+                            qty: t.Qty,
+                            unit: rawSheetData[t.Material_ID]?.unit || "หน่วย",
+                            requester: t.Person_In_Charge,
+                            note: t.Note,
+                            status: t.Status === 'PENDING' ? 'รออนุมัติ' : (t.Status === 'APPROVED' ? 'อนุมัติ' : 'ปฏิเสธ')
+                        };
+                    }).reverse(); // ให้ข้อมูลล่าสุดอยู่ด้านบน
+
+                    // อัปเดตตัวเลขแจ้งเตือน Pending
+                    const pendingCount = transactionsDatabase.filter(t => t.status === 'รออนุมัติ').length;
+                    document.getElementById('pendingBadge').innerText = pendingCount;
+                    document.getElementById('card-pending-count').innerText = pendingCount + " รายการ";
+                    document.getElementById('pendingSummaryBadge').innerText = pendingCount + " รายการ";
+
+                    // ส่งต่อไปให้ฟังก์ชันประมวลผลเดิมของ UI คุณ
+                    onDataLoaded(rawSheetData);
+                } else {
+                    alert("Error โหลดข้อมูล: " + result.message);
                 }
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+            } catch (e) {
+                console.error("Fetch Error:", e);
+                alert("เกิดข้อผิดพลาดในการโหลดข้อมูลข้ามโดเมน (CORS/Network)");
             }
         }
 
-        // === ฟังก์ชัน Submit สำหรับเบิก/รับของ (POST) ===
+        // 2. ฟังก์ชัน Submit สำหรับขอทำรายการ (ส่งไป รออนุมัติ)
         async function handleTransactionSubmit(e) {
             e.preventDefault();
-            
-            const submitBtn = document.getElementById("submitBtn");
-            const originalBtnText = submitBtn.innerText;
-            submitBtn.innerText = "กำลังบันทึก...";
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerText;
+            submitBtn.innerText = "กำลังส่งคำร้อง...";
             submitBtn.disabled = true;
 
-            const type = document.getElementById("transType").value.toUpperCase(); 
-            const itemId = document.getElementById("transItem").value;
-            const qty = parseFloat(document.getElementById("transQty").value);
+            const currentMode = document.getElementById("formCurrentMode").value; 
+            let type = currentMode.toUpperCase();
             
-            const docRef = document.getElementById("transDoc").value || "N/A";
-            const person = document.getElementById("transPerson").value || "N/A";
-            const note = document.getElementById("transNote").value || "-";
-            
-            const item = inventoryData.find(i => i.id === itemId);
-            
-            if (type === 'OUT' && item.qty < qty) {
-                alert("จำนวนสินค้าคงเหลือไม่พอสำหรับการเบิกจ่าย!");
-                submitBtn.innerText = originalBtnText;
-                submitBtn.disabled = false;
-                return;
+            if (currentMode === 'adj') {
+                const adjAction = document.querySelector('input[name="adjustAction"]:checked').value;
+                type = adjAction === 'plus' ? 'ADJ_IN' : 'ADJ_OUT';
             }
 
-            // เตรียมพารามิเตอร์ส่งไปแบบ GET Request
             const params = new URLSearchParams({
-                action: 'transaction',
+                action: 'request',
                 type: type,
-                itemId: itemId,
-                qty: qty,
-                doc: docRef,
-                person: person,
-                projectLoc: item.location,
-                note: note,
-                t: new Date().getTime() // ป้องกันเบราว์เซอร์จำข้อมูลเก่า
+                projectLoc: document.getElementById("modalSiteSelect").value,
+                itemId: document.getElementById("modalItemSelect").value,
+                qty: document.getElementById("modalQty").value,
+                doc: document.getElementById("modalDoc").value,
+                person: document.getElementById("modalPerson").value,
+                note: document.getElementById("modalNote").value,
+                t: new Date().getTime()
             });
-
-            // สร้าง URL แบบเต็ม
-            const targetUrl = WEB_APP_URL + "?" + params.toString();
 
             try {
-                // ใช้ GET ปกติทะลวง CORS 100%
-                const response = await fetch(targetUrl);
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    showToast(`${type === 'OUT' ? 'เบิก' : 'รับเข้า'} ${item.name} จำนวน ${qty} ${item.unit} เรียบร้อยแล้ว`);
-                    closeTransactionModal();
-                    fetchDataFromAPI(); // รีโหลดข้อมูลใหม่ทันที
+                const res = await fetch(WEB_APP_URL + "?" + params.toString());
+                const result = await res.json();
+                if(result.status === 'success') {
+                    showToast("ส่งคำร้องขอทำรายการเรียบร้อย!");
+                    closeModal();
+                    fetchSheetData(); // โหลดใหม่เพื่อโชว์ในรออนุมัติ
                 } else {
-                    alert("Error จากระบบ: " + result.message);
+                    alert(result.message);
                 }
-            } catch (error) {
-                console.error("Submit Error:", error);
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ (Network/CORS)");
-            } finally {
-                submitBtn.innerText = originalBtnText;
-                submitBtn.disabled = false;
-            }
+            } catch (err) { alert("เชื่อมต่อล้มเหลว"); } 
+            finally { submitBtn.innerText = originalText; submitBtn.disabled = false; }
         }
 
-        // Filter Data by Selected Project
-        function filterProjectData() {
-            renderInventoryTable();
-            updateKPIs();
+        // 3. ฟังก์ชันอนุมัติ/ปฏิเสธรายการ
+        async function approveTransaction(transId, isApprove) {
+            if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
+
+            const action = isApprove ? 'approve' : 'reject';
+            const params = new URLSearchParams({ action: action, transId: transId, t: new Date().getTime() });
+            
+            try {
+                const res = await fetch(WEB_APP_URL + "?" + params.toString());
+                const result = await res.json();
+                if(result.status === 'success') {
+                    showToast(result.message);
+                    fetchSheetData(); // ซิงค์ใหม่เพื่อตัดสต็อกและลบออกจากคิว
+                } else {
+                    alert("ข้อผิดพลาด: " + result.message);
+                }
+            } catch (err) { alert("เชื่อมต่อล้มเหลว"); }
         }
 
-        // Render Inventory Table
-        function renderInventoryTable() {
-            const tbody = document.getElementById("inventoryTableBody");
-            const selectedProject = document.getElementById("projectFilter").value;
-            const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-            const selectedCategory = document.getElementById("categoryFilter").value;
-
+        // 4. แก้ไขปุ่มในตาราง รออนุมัติ (เพิ่มปุ่มปฏิเสธ)
+        function renderApprovalTable() {
+            const tbody = document.getElementById("approvalTableBody");
+            if (!tbody) return;
             tbody.innerHTML = "";
-
-            let filtered = inventoryData.filter(item => {
-                const matchProject = selectedProject === "all" || item.project === selectedProject;
-                const matchSearch = item.name.toLowerCase().includes(searchTerm) || item.id.toLowerCase().includes(searchTerm);
-                const matchCat = selectedCategory === "all" || item.category === selectedCategory;
-                return matchProject && matchSearch && matchCat;
-            });
-
-            document.getElementById("displayedCount").innerText = filtered.length;
-            document.getElementById("totalCount").innerText = inventoryData.length;
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400">ไม่พบรายการวัสดุตรงตามเงื่อนไข</td></tr>`;
+            let pendingItems = transactionsDatabase.filter(t => t.status === 'รออนุมัติ');
+            
+            if (pendingItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400 font-bold">🎉 ไม่มีรายการรออนุมัติ</td></tr>`;
                 return;
             }
 
-            filtered.forEach(item => {
-                const isLow = item.qty <= item.min;
-                const statusBadge = isLow 
-                    ? `<span class="bg-rose-100 text-rose-700 text-xs px-2.5 py-1 rounded-full font-semibold inline-flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>สต็อกต่ำ</span>`
-                    : `<span class="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-semibold inline-flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>ปกติ</span>`;
+            pendingItems.forEach(item => {
+                let badgeColor = item.typeRaw.includes('OUT') ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b">
+                        <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
+                        <td class="py-3 px-4 font-medium"><span class="${badgeColor} px-2 py-0.5 rounded text-[11px] font-bold mr-2">${item.typeRaw}</span>${item.site}</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${item.itemName}</td>
+                        <td class="py-3 px-4 text-right font-bold text-slate-900">${item.qty} ${item.unit}</td>
+                        <td class="py-3 px-4 text-xs">${item.requester}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="approveTransaction('${item.id}', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-sm transition mr-1">อนุมัติ</button>
+                            <button onclick="approveTransaction('${item.id}', false)" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-sm transition">ปฏิเสธ</button>
+                        </td>
+                    </tr>`;
+            });
+        }
 
+        function onDataLoaded(rawSheetData) {
+            inventoryData = [];
+            let totalCompanyInVal = 0;
+            let totalCompanyStockVal = 0;
+            
+            let siteTotals = {
+                "สโตร์กลาง": { stockVal: 0, inVal: 0 },
+                "ทวีวงษ์ New factory": { stockVal: 0, inVal: 0 },
+                "บุญพา": { stockVal: 0, inVal: 0 },
+                "บ้านคุณบี": { stockVal: 0, inVal: 0 },
+                "บ้านคุณอรรถา": { stockVal: 0, inVal: 0 },
+                "KVG อาคารเก็บสินค้า": { stockVal: 0, inVal: 0 },
+                "ศิริชัย": { stockVal: 0, inVal: 0 }
+            };
+
+            for (let code in rawSheetData) {
+                let item = rawSheetData[code];
+                let unitPrice = 150;
+
+                let siteStocks = { "all": 0 };
+                let itemTotalStock = 0;
+
+                for (let site in item.stocks) {
+                    let qty = item.stocks[site];
+                    siteStocks[site] = qty;
+                    itemTotalStock += qty;
+                    
+                    if (siteTotals[site]) {
+                        siteTotals[site].stockVal += (qty * unitPrice);
+                        siteTotals[site].inVal += (qty * unitPrice * 1.2);
+                    }
+                }
+                siteStocks["all"] = itemTotalStock;
+
+                totalCompanyStockVal += (itemTotalStock * unitPrice);
+                totalCompanyInVal += (itemTotalStock * unitPrice * 1.2);
+
+                inventoryData.push({
+                    id: item.code,
+                    name: item.name || "วัสดุก่อสร้าง",
+                    category: "โครงสร้าง",
+                    min: 50,
+                    unit: item.unit || "หน่วย",
+                    unitPrice: unitPrice,
+                    location: "คลังหลัก",
+                    siteStocks: siteStocks
+                });
+            }
+
+            materialProjectData = {
+                "all": { name: "รวมทุกโครงการ (ภาพรวมบริษัท)", icon: "🌐", inVal: "฿" + totalCompanyInVal.toLocaleString(), stock: "฿" + totalCompanyStockVal.toLocaleString(), usedVal: "฿" + (totalCompanyInVal - totalCompanyStockVal).toLocaleString(), pct: "81.3%", low: 0, status: "ภาพรวมทั้งบริษัท" },
+                "ทวีวงษ์ New factory": { name: "ทวีวงษ์ New factory", icon: "🏗️", inVal: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "81.6%", low: 0, status: "เบิกใช้ต่อเนื่อง" },
+                "สโตร์กลาง": { name: "สโตร์กลาง", icon: "🏢", inVal: "฿" + (siteTotals["สโตร์กลาง"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["สโตร์กลาง"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "71.9%", low: 0, status: "พร้อมจ่ายของ" },
+                "บุญพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุญพา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บุญพา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "83.3%", low: 0, status: "งานสถาปัตย์" },
+                "บ้านคุณบี": { name: "บ้านคุณบี", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณบี"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณบี"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "89.0%", low: 0, status: "งานระบบ" },
+                "บ้านคุณอรรถา": { name: "บ้านคุณอรรถา", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณอรรถา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณอรรถา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "90.2%", low: 0, status: "งานตกแต่ง" },
+                "ศิริชัย": { name: "ศิริชัย", icon: "🏗️", inVal: "฿" + (siteTotals["ศิริชัย"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ศิริชัย"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "90.4%", low: 0, status: "งานเก็บงาน" },
+                "KVG อาคารเก็บสินค้า": { name: "KVG อาคารเก็บสินค้า", icon: "🏬", inVal: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.stockVal || 0).toLocaleString(), usedVal: "฿0", pct: "81.0%", low: 0, status: "งานโครงสร้าง" }
+            };
+
+            initCharts();
+            initReportCharts();
+            populateModalMaterials();
+            renderAll();
+            openProjectDrilldown("all");
+        }
+
+        function syncSiteFilter(selectedSite) {
+            const headerSelect = document.getElementById("siteFilter");
+            const tableSelect = document.getElementById("tableSiteFilter");
+            if (headerSelect) headerSelect.value = selectedSite;
+            if (tableSelect) tableSelect.value = selectedSite;
+            renderAll();
+        }
+
+        function populateModalMaterials() {
+            const select = document.getElementById("modalItemSelect");
+            if (!select) return;
+            select.innerHTML = "";
+            inventoryData.forEach(item => {
+                const opt = document.createElement("option");
+                opt.value = item.id;
+                opt.innerText = `${item.name} (คงเหลือ: ${item.siteStocks["all"]} ${item.unit})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function updateLiveStockHint() {}
+
+        function switchView(viewName) {
+            const allViews = ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'];
+            allViews.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+            });
+            const current = document.getElementById(`view-${viewName}`);
+            if (current) current.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function toggleTransactionSubmenu() { document.getElementById("transSubmenu").classList.toggle("hidden"); }
+        function toggleReportSubmenu() { document.getElementById("reportSubmenu").classList.toggle("hidden"); }
+
+        function renderAll() {
+            renderInventoryTable();
+            renderLowStockAlertTable();
+            renderProjectCardsGrid();
+            renderSubmenuHistoryTables();
+            renderApprovalTable();
+        }
+
+        function renderLowStockAlertTable() {
+            const tbody = document.getElementById("lowStockAlertTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            let lowStockItems = [];
+
+            inventoryData.forEach(item => {
+                if (item.siteStocks["all"] <= item.min) {
+                    lowStockItems.push({ ...item, deficit: item.min - item.siteStocks["all"] });
+                }
+            });
+
+            document.getElementById("card-low-stock").innerText = `${lowStockItems.length} รายการ`;
+            const badge = document.getElementById("lowStockTableBadge");
+            if (badge) badge.innerText = `${lowStockItems.length} รายการ`;
+
+            if (lowStockItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-emerald-600 font-bold">✅ สต็อกเพียงพอทุกรายการ</td></tr>`;
+                return;
+            }
+
+            lowStockItems.forEach(item => {
                 const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-50 transition";
                 tr.innerHTML = `
-                    <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-500">${item.id}</td>
-                    <td class="py-3.5 px-4 font-medium text-slate-900">${item.name}</td>
-                    <td class="py-3.5 px-4 text-xs"><span class="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">${item.category}</span></td>
-                    <td class="py-3.5 px-4 text-right font-bold ${isLow ? 'text-rose-600' : 'text-slate-800'}">${item.qty.toLocaleString()}</td>
-                    <td class="py-3.5 px-4 text-right text-slate-400">${item.min.toLocaleString()}</td>
-                    <td class="py-3.5 px-4 text-xs text-slate-500">${item.unit}</td>
-                    <td class="py-3.5 px-4 text-center">${statusBadge}</td>
-                    <td class="py-3.5 px-4 text-xs text-slate-500">${item.location}</td>
-                    <td class="py-3.5 px-4 text-center">
-                        <button onclick="quickAction('${item.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-medium transition">
-                            ปรับสต็อก
-                        </button>
-                    </td>
+                    <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
+                    <td class="py-3 px-4 font-bold">${item.name}</td>
+                    <td class="py-3 px-4 text-right font-bold text-rose-600">${item.siteStocks["all"]}</td>
+                    <td class="py-3 px-4 text-right">${item.min}</td>
+                    <td class="py-3 px-4 text-center"><span class="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded font-bold">สต็อกต่ำ</span></td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        // Update Summary KPI Cards
-        function updateKPIs() {
-            const selectedProject = document.getElementById("projectFilter").value;
-            const items = selectedProject === "all" ? inventoryData : inventoryData.filter(i => i.project === selectedProject);
-            
-            const lowCount = items.filter(i => i.qty <= i.min).length;
-            document.getElementById("lowStockCountText").innerText = `${lowCount} รายการ`;
+        function renderProjectCardsGrid() {
+            const container = document.getElementById("projectCardsContainer");
+            if (!container) return;
+            container.innerHTML = "";
 
-            // Dynamic mock calculation based on count
-            const baseValue = selectedProject === "all" ? 4250800 : (selectedProject === "p1" ? 1850000 : (selectedProject === "p2" ? 1400000 : 1000800));
-            document.getElementById("totalValueText").innerText = `฿${baseValue.toLocaleString()}`;
-        }
+            Object.entries(materialProjectData).forEach(([siteKey, p]) => {
+                const isActive = (siteKey === currentDrilldownSite);
+                const card = document.createElement("div");
+                card.className = `p-4 rounded-2xl border-2 transition-all cursor-pointer bg-white hover:border-amber-400 ${isActive ? 'project-card-active' : 'border-slate-200'}`;
+                card.onclick = () => openProjectDrilldown(siteKey);
 
-        // Open Dispense / Receive Transaction Modal
-        function openTransactionModal(type) {
-            const modal = document.getElementById("transactionModal");
-            const title = document.getElementById("modalTitle");
-            const iconContainer = document.getElementById("modalIconContainer");
-            const icon = document.getElementById("modalIcon");
-            const submitBtn = document.getElementById("submitBtn");
-            const transType = document.getElementById("transType");
-
-            transType.value = type;
-
-            if (type === 'out') {
-                title.innerText = "บันทึกการเบิกจ่ายวัสดุ";
-                iconContainer.className = "p-2.5 rounded-xl bg-amber-100 text-amber-700";
-                icon.setAttribute("data-lucide", "minus-circle");
-                submitBtn.className = "px-5 py-2.5 text-sm font-semibold text-slate-950 bg-amber-500 hover:bg-amber-600 rounded-xl shadow-md transition";
-                submitBtn.innerText = "บันทึกการเบิก";
-            } else {
-                title.innerText = "บันทึกรับเข้าวัสดุสินค้า";
-                iconContainer.className = "p-2.5 rounded-xl bg-emerald-100 text-emerald-700";
-                icon.setAttribute("data-lucide", "plus-circle");
-                submitBtn.className = "px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition";
-                submitBtn.innerText = "บันทึกการรับเข้า";
-            }
-
-            // Populate Material Select Options
-            const itemSelect = document.getElementById("transItem");
-            itemSelect.innerHTML = "";
-            inventoryData.forEach(item => {
-                const opt = document.createElement("option");
-                opt.value = item.id;
-                opt.innerText = `[${item.id}] ${item.name} (คงเหลือ: ${item.qty} ${item.unit})`;
-                itemSelect.appendChild(opt);
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-bold text-slate-900 text-sm">${p.icon} ${p.name}</h4>
+                        ${isActive ? '<span class="bg-amber-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full">กำลังดู</span>' : ''}
+                    </div>
+                    <p class="text-xs text-slate-500">คงเหลือ: <span class="font-bold text-emerald-600">${p.stock}</span></p>
+                `;
+                container.appendChild(card);
             });
-
-            lucide.createIcons();
-            modal.classList.remove("hidden");
-            modal.classList.add("flex");
         }
 
-        function closeTransactionModal() {
-            const modal = document.getElementById("transactionModal");
-            modal.classList.add("hidden");
-            modal.classList.remove("flex");
-            document.getElementById("transactionForm").reset();
+        function openProjectDrilldown(siteName) {
+            currentDrilldownSite = siteName;
+            const p = materialProjectData[siteName] || materialProjectData["all"];
+
+            document.getElementById("metricProjectName").innerText = `${p.icon} ${p.name}`;
+            document.getElementById("metricTotalIn").innerText = p.inVal;
+            document.getElementById("metricStockVal").innerText = p.stock;
+            document.getElementById("metricUsedVal").innerText = p.usedVal;
+
+            renderProjectCardsGrid();
+            renderDrilldownTable();
         }
 
-        function quickAction(itemId) {
-            openTransactionModal('out');
-            document.getElementById("transItem").value = itemId;
+        function renderDrilldownTable() {
+            const tbody = document.getElementById("projectDrilldownTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            inventoryData.forEach(item => {
+                let stock = currentDrilldownSite === "all" ? item.siteStocks["all"] : (item.siteStocks[currentDrilldownSite] || 0);
+                let totalVal = stock * item.unitPrice;
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
+                    <td class="py-3 px-4 font-bold">${item.name}</td>
+                    <td class="py-3 px-4 text-right font-bold">${stock.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-right font-mono">฿${item.unitPrice.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-right font-bold text-emerald-700 font-mono">฿${totalVal.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
-        // Toast Notification
+        function renderSubmenuHistoryTables() {
+            const outTbody = document.getElementById("transOutTableBody");
+            const inTbody = document.getElementById("transInTableBody");
+            const adjTbody = document.getElementById("transAdjTableBody");
+
+            if (outTbody) outTbody.innerHTML = "";
+            if (inTbody) inTbody.innerHTML = "";
+            if (adjTbody) adjTbody.innerHTML = "";
+
+            transactionsDatabase.forEach(item => {
+                const statusBadge = item.status === 'รออนุมัติ' 
+                    ? `<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded font-bold">⏳ รออนุมัติ</span>`
+                    : `<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded font-bold">✓ อนุมัติ</span>`;
+
+                if (item.mode === 'out' && outTbody) {
+                    outTbody.innerHTML += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="py-3 px-4 text-xs">${item.date}</td>
+                            <td class="py-3 px-4 font-mono font-bold text-xs">${item.id}</td>
+                            <td class="py-3 px-4 font-medium">${item.site}</td>
+                            <td class="py-3 px-4 font-bold">${item.itemName}</td>
+                            <td class="py-3 px-4 text-right font-bold text-amber-600">${item.qty} ${item.unit}</td>
+                            <td class="py-3 px-4 text-xs">${item.requester}</td>
+                            <td class="py-3 px-4 text-center">${statusBadge}</td>
+                        </tr>`;
+                }
+                if (item.mode === 'in' && inTbody) {
+                    inTbody.innerHTML += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="py-3 px-4 text-xs">${item.date}</td>
+                            <td class="py-3 px-4 font-mono font-bold text-xs">${item.id}</td>
+                            <td class="py-3 px-4 font-medium">${item.site}</td>
+                            <td class="py-3 px-4 font-bold">${item.itemName}</td>
+                            <td class="py-3 px-4 text-right font-bold text-emerald-600">${item.qty} ${item.unit}</td>
+                            <td class="py-3 px-4 text-xs">${item.requester}</td>
+                            <td class="py-3 px-4 text-center">${statusBadge}</td>
+                        </tr>`;
+                }
+            });
+        }
+
+        function renderApprovalTable() {
+            const tbody = document.getElementById("approvalTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            transactionsDatabase.filter(t => t.status === 'รออนุมัติ').forEach(item => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
+                        <td class="py-3 px-4 font-medium">${item.site}</td>
+                        <td class="py-3 px-4 font-bold">${item.itemName}</td>
+                        <td class="py-3 px-4 text-right font-bold">${item.qty} ${item.unit}</td>
+                        <td class="py-3 px-4 text-xs">${item.requester}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="approveTransaction('${item.id}', true)" class="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded font-bold">อนุมัติ</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function renderInventoryTable() {
+            const tbody = document.getElementById("inventoryTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            inventoryData.forEach(item => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-4 font-mono text-xs">${item.id}</td>
+                        <td class="py-3 px-4 font-bold">${item.name}</td>
+                        <td class="py-3 px-4 text-xs">${item.category}</td>
+                        <td class="py-3 px-4 text-right font-bold">${item.siteStocks["all"]}</td>
+                        <td class="py-3 px-4 text-right text-slate-400">${item.min}</td>
+                        <td class="py-3 px-4 text-xs">${item.unit}</td>
+                        <td class="py-3 px-4 text-center"><span class="text-emerald-600 font-bold text-xs">● ปกติ</span></td>
+                        <td class="py-3 px-4 text-xs">${item.location}</td>
+                        <td class="py-3 px-4 text-center"><button class="text-xs bg-slate-100 px-2 py-1 rounded">ปรับสต็อก</button></td>
+                    </tr>`;
+            });
+        }
+
+        function openTransactionModal(type) { document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); }
+        function closeModal() { document.getElementById("transModal").classList.add("hidden"); }
+        function handleTransactionSubmit(e) { e.preventDefault(); showToast("บันทึกสำเร็จ"); closeModal(); }
         function showToast(msg) {
             const toast = document.getElementById("toast");
             document.getElementById("toastMessage").innerText = msg;
             toast.classList.remove("hidden");
             toast.classList.add("flex");
-            setTimeout(() => {
-                toast.classList.add("hidden");
-                toast.classList.remove("flex");
-            }, 3500);
+            setTimeout(() => { toast.classList.add("hidden"); }, 3000);
         }
 
-        // Initialize Chart.js
         function initCharts() {
-            // Usage Trend Line Chart
-            const ctx1 = document.getElementById('usageChart').getContext('2d');
-            usageChartInstance = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels: ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'],
-                    datasets: [
-                        {
-                            label: 'ปูนซีเมนต์ (ถุง)',
-                            data: [120, 190, 300, 250, 220, 130, 80],
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                            fill: true,
-                            tension: 0.3
-                        },
-                        {
-                            label: 'เหล็กเส้น (ตัน)',
-                            data: [12, 18, 15, 25, 20, 10, 5],
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            fill: true,
-                            tension: 0.3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { grid: { color: '#f1f5f9' } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
+            const ctx1 = document.getElementById('usageTrendChart')?.getContext('2d');
+            if (ctx1) new Chart(ctx1, { type: 'line', data: { labels: ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'], datasets: [{ label: 'ปูน', data: [12, 19, 3, 5, 2, 3, 7], borderColor: '#f59e0b' }] } });
+            const ctx2 = document.getElementById('categoryPieChart')?.getContext('2d');
+            if (ctx2) new Chart(ctx2, { type: 'doughnut', data: { labels: ['โครงสร้าง', 'สถาปัตย์'], datasets: [{ data: [70, 30], backgroundColor: ['#0f172a', '#f59e0b'] }] } });
+        }
 
-            // Category Doughnut Chart
-            const ctx2 = document.getElementById('categoryChart').getContext('2d');
-            categoryChartInstance = new Chart(ctx2, {
-                type: 'doughnut',
-                data: {
-                    labels: ['โครงสร้าง', 'สถาปัตยกรรม', 'งานระบบ', 'เครื่องมือ'],
-                    datasets: [{
-                        data: [45, 25, 20, 10],
-                        backgroundColor: ['#0f172a', '#f59e0b', '#3b82f6', '#10b981'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    cutout: '70%'
-                }
-            });
+        function initReportCharts() {
+            const c1 = document.getElementById('disbursementMonthlyChart')?.getContext('2d');
+            if (c1) new Chart(c1, { type: 'bar', data: { labels: ['ม.ค.', 'ก.พ.', 'มี.ค.'], datasets: [{ data: [20, 30, 40], backgroundColor: '#f59e0b' }] } });
+            const c2 = document.getElementById('receivingMonthlyChart')?.getContext('2d');
+            if (c2) new Chart(c2, { type: 'bar', data: { labels: ['ม.ค.', 'ก.พ.', 'มี.ค.'], datasets: [{ data: [15, 25, 35], backgroundColor: '#10b981' }] } });
+            const c3 = document.getElementById('companyOverviewChart')?.getContext('2d');
+            if (c3) new Chart(c3, { type: 'bar', data: { labels: ['สโตร์กลาง', 'ทวีวงษ์'], datasets: [{ data: [50, 80], backgroundColor: '#3b82f6' }] } });
         }
     </script>
 </body>
