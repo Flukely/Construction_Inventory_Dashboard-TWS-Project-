@@ -485,7 +485,7 @@
         let inventoryData = [];
         let materialProjectData = {};
         let transactionsDatabase = [];
-        let currentActiveView = 'dashboard'; // จดจำหน้าปัจจุบัน
+        let currentActiveView = 'dashboard'; 
 
         // ท่าไม้ตาย JSONP ทะลวง CORS
         function fetchJSONP(url) {
@@ -513,24 +513,20 @@
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
-            // อัปเดตจำนวนคงเหลือใน Modal ทันทีเมื่อเปลี่ยนรายการวัสดุ [ข้อ 6]
-            document.getElementById("modalItemSelect").addEventListener('change', function(e) {
-                const selectedId = e.target.value;
-                const selectedSite = document.getElementById("modalSiteSelect").value;
-                const item = inventoryData.find(i => i.id === selectedId);
-                
-                if (item) {
-                    // ดึงสต็อกตามไซต์ที่เลือกใน Modal
-                    let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? item.siteStocks["all"] : item.siteStocks[selectedSite];
-                    document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${stock.toLocaleString()} ${item.unit}`;
-                } else {
-                    document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
+            // อัปเดตจำนวนคงเหลือใน Modal ทันทีเมื่อเปลี่ยนรายการวัสดุหรือไซต์งาน [ข้อ 6]
+            document.addEventListener('change', function(e) {
+                if (e.target && (e.target.id === 'modalItemSelect' || e.target.id === 'modalSiteSelect')) {
+                    const selectedId = document.getElementById("modalItemSelect").value;
+                    const selectedSite = document.getElementById("modalSiteSelect").value;
+                    const item = inventoryData.find(i => i.id === selectedId);
+                    
+                    if (item) {
+                        let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? item.siteStocks["all"] : item.siteStocks[selectedSite];
+                        document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${stock.toLocaleString()} ${item.unit}`;
+                    } else {
+                        document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
+                    }
                 }
-            });
-
-            // อัปเดตสต็อกเมื่อเปลี่ยนไซต์ใน Modal ด้วย
-            document.getElementById("modalSiteSelect").addEventListener('change', function() {
-                document.getElementById("modalItemSelect").dispatchEvent(new Event('change'));
             });
         });
 
@@ -575,11 +571,11 @@
                     document.getElementById('pendingSummaryBadge').innerText = pendingCount + " รายการ";
 
                     onDataLoaded(rawSheetData);
-                } else { alert("Error: " + result.message); }
+                } else { console.error("Error: " + result.message); }
             } catch (e) { console.error(e); }
         }
 
-        // บันทึกรายการ (ขอเบิก / รับเข้า / ปรับปรุง) [ข้อ 3, 4, 5]
+        // บันทึกรายการ (ขอเบิก / รับเข้า / ปรับปรุง) พร้อมหน่วงเวลารอฐานข้อมูล [ข้อ 3, 4, 5]
         async function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -609,15 +605,19 @@
                 const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
                 if(result.status === 'success') {
                     closeModal();
-                    showToast("บันทึกรายการสำเร็จ!");
-                    await fetchSheetData(true); // อัปเดตข้อมูลแบบทันทีโดยไม่รีเซ็ตหน้าจอ
-                    switchView(currentActiveView); // คงอยู่ที่หน้าเดิม
+                    showToast("บันทึกคำร้องสำเร็จ! กำลังซิงค์ข้อมูล...");
+                    
+                    // หน่วงเวลา 1.8 วินาทีเพื่อให้ Google Sheets บันทึกเสร็จสนิท
+                    setTimeout(async () => {
+                        await fetchSheetData(true); 
+                        switchView(currentActiveView); // คงอยู่ที่หน้าเดิม ไม่เด้งกลับหน้าแรก
+                    }, 1800);
                 } else { alert("Error: " + result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); } 
             finally { submitBtn.innerText = originalText; submitBtn.disabled = false; }
         }
 
-        // อนุมัติ / ปฏิเสธ [ข้อ 7]
+        // อนุมัติ / ปฏิเสธ พร้อมหน่วงเวลา [ข้อ 7]
         async function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
@@ -627,21 +627,24 @@
                 const result = await fetchJSONP(WEB_APP_URL + "?" + params.toString());
                 if(result.status === 'success') {
                     showToast(result.message);
-                    await fetchSheetData(true); // อัปเดตข้อมูลทันที
-                    switchView(currentActiveView); // อยู่ที่หน้าเดิม
+                    
+                    // หน่วงเวลา 1.8 วินาทีให้ Google Sheets อัปเดตสต็อกเสร็จ
+                    setTimeout(async () => {
+                        await fetchSheetData(true); 
+                        switchView(currentActiveView); // คงอยู่ที่หน้าเดิม
+                    }, 1800);
                 } else { alert("Error: " + result.message); }
             } catch (err) { alert("เชื่อมต่อล้มเหลว"); }
         }
 
         // จัดการเปลี่ยนหน้าจอ [ข้อ 1]
         function switchView(viewName) { 
-            currentActiveView = viewName; // บันทึกหน้าปัจจุบัน
+            currentActiveView = viewName; 
             ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
                 const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
             });
             const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); 
             
-            // แมปชื่อ view กับ id ของปุ่มเมนูซ้าย
             let navId = 'nav-dashboard';
             if(viewName === 'inventory') navId = 'nav-inventory';
             else if(viewName === 'trans-out') navId = 'nav-trans-out';
@@ -890,7 +893,6 @@
 
             document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); 
             
-            // Trigger อัปเดตยอดคงเหลือเริ่มต้น
             setTimeout(() => {
                 const itemSelect = document.getElementById("modalItemSelect");
                 if (itemSelect.options.length > 0) itemSelect.dispatchEvent(new Event('change'));
