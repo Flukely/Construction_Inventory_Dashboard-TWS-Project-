@@ -509,10 +509,10 @@
             });
         });
 
-        // 1. โหลดข้อมูลหลักแบบ Real-time
+        // 1. โหลดข้อมูลหลักแบบ Real-time (ป้องกัน Cache 100%)
         async function fetchSheetData(isSilent = false) {
             if (!isSilent) {
-                const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูล...</p></td></tr>`;
+                const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูลแบบ Real-time...</p></td></tr>`;
                 ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody', 'projectDrilldownTableBody'].forEach(id => {
                     const el = document.getElementById(id); if(el) el.innerHTML = loaderHTML;
                 });
@@ -520,8 +520,9 @@
             }
 
             try {
-                // ใช้ fetch ปกติ ทะลวงข้อมูล
-                const response = await fetch(WEB_APP_URL + "?action=load&t=" + new Date().getTime());
+                // เติมพารามิเตอร์ t เพื่อป้องกันเบราว์เซอร์ใช้แคชเก่า
+                const url = `${WEB_APP_URL}?action=load&t=${new Date().getTime()}`;
+                const response = await fetch(url);
                 const result = await response.json();
                 
                 if (result.status === 'success') {
@@ -556,12 +557,12 @@
             } catch (e) { console.error("Load Data Error:", e); }
         }
 
-        // 2. บันทึกคำร้อง (แก้ปัญหาเว็บค้างและไม่อัปเดต)
+        // 2. บันทึกคำร้อง (ใช้ fetch ทะลวง CORS + Delay รอฝั่ง Server)
         function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerText;
-            submitBtn.innerText = "กำลังบันทึก...";
+            submitBtn.innerText = "กำลังส่งข้อมูล...";
             submitBtn.disabled = true;
 
             const currentMode = document.getElementById("formCurrentMode").value; 
@@ -579,15 +580,15 @@
                 doc: document.getElementById("modalDoc").value,
                 person: document.getElementById("modalPerson").value,
                 note: document.getElementById("modalNote").value,
-                t: new Date().getTime()
+                t: new Date().getTime() // ป้องกัน Cache ของการยิงคำสั่ง
             });
 
-            // ใช้ no-cors ยิงข้อมูลทิ้งไว้ ไม่ต้องรอ Google ตอบกลับให้เสียเวลา
+            // ส่งข้อมูลด้วย mode: 'no-cors' เพื่อไม่ให้เบราว์เซอร์ฟ้อง Error
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 closeModal();
                 showToast("บันทึกคำร้องสำเร็จ! กำลังอัปเดตหน้าจอ...");
                 
-                // หน่วง 1.5 วินาทีให้ Google บันทึกเสร็จ แล้วโหลดข้อมูลใหม่เข้าสู่หน้าจอเดิมเงียบๆ
+                // รอ 1.5 วินาที ให้ Apps Script เขียนลง Sheets เสร็จ แล้วสั่งโหลดใหม่
                 setTimeout(() => {
                     fetchSheetData(true).then(() => {
                         switchView(currentActiveView);
@@ -602,14 +603,19 @@
             });
         }
 
-        // 3. อนุมัติ / ปฏิเสธ (อัปเดตตารางทันที)
+        // 3. อนุมัติ / ปฏิเสธ (ใช้ fetch ทะลวง CORS + Delay)
         function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
-            const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
+            const params = new URLSearchParams({ 
+                action: isApprove ? 'approve' : 'reject', 
+                transId: transId, 
+                t: new Date().getTime() // สำคัญมาก: ป้องกันเบราว์เซอร์ใช้แคชเก่า
+            });
             
             showToast("กำลังประมวลผลการอนุมัติ...");
             
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
+                // รอให้เซิร์ฟเวอร์เคลียร์ยอดสต็อก 1.5 วินาที
                 setTimeout(() => {
                     showToast("อัปเดตสถานะสำเร็จ!");
                     fetchSheetData(true).then(() => {
@@ -620,7 +626,7 @@
         }
 
         // =====================================
-        // ฟังก์ชันเปลี่ยนหน้าจอ (เก็บสถานะปุ่มและหน้าจอไว้)
+        // ฟังก์ชัน UI ย่อยด้านล่างนี้ทำงานเหมือนเดิม 100% 
         // =====================================
         function switchView(viewName) { 
             currentActiveView = viewName; 
