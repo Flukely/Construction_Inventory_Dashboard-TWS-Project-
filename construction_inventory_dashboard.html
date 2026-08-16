@@ -517,7 +517,6 @@
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
-            // อัปเดตจำนวนคงเหลือใน Modal เมื่อมีการเปลี่ยนค่า
             document.addEventListener('change', function(e) {
                 if (e.target && (e.target.id === 'modalItemSelect' || e.target.id === 'modalSiteSelect')) {
                     const selectedId = document.getElementById("modalItemSelect").value;
@@ -534,7 +533,6 @@
             });
         });
 
-        // 1. โหลดข้อมูลหลักแบบ Real-time
         async function fetchSheetData(isSilent = false) {
             if (!isSilent) {
                 const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูลแบบ Real-time...</p></td></tr>`;
@@ -575,7 +573,6 @@
             } catch (e) { console.error("Load Data Error:", e); }
         }
 
-        // 2. บันทึกคำร้อง 
         function handleTransactionSubmit(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -604,7 +601,6 @@
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 closeModal();
                 showToast("บันทึกคำร้องสำเร็จ! กำลังอัปเดตหน้าจอ...");
-                
                 setTimeout(() => {
                     fetchSheetData(true).then(() => {
                         submitBtn.innerText = originalText; 
@@ -618,13 +614,11 @@
             });
         }
 
-        // 3. อนุมัติ / ปฏิเสธ
         function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
             
             showToast("กำลังประมวลผลการอนุมัติ...");
-            
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 setTimeout(() => {
                     showToast("อัปเดตสถานะสำเร็จ!");
@@ -633,47 +627,36 @@
             }).catch(err => { alert("เกิดข้อผิดพลาด"); });
         }
 
-        // =====================================
-        // ฟังก์ชันอัปเดตข้อมูลลงหน้าจอหลัก (แดชบอร์ด) และชาร์ต
-        // =====================================
         function updateDashboardCards() {
             const site = document.getElementById("siteFilter").value;
-            // ดึงชื่อไซต์จาก dropdown มาแสดง
             const siteSelectEl = document.getElementById("siteFilter");
             const rawSiteName = siteSelectEl.options[siteSelectEl.selectedIndex].text;
             const siteNameDisplay = site === "all" ? "ทุกโครงการ (รวมทั้งหมด)" : rawSiteName.replace(/.*โครงการ:\s*/, '').replace(/.*สโตร์กลาง.*/, 'สโตร์กลาง');
             
-            let totalInVal = 0;
-            let totalStockVal = 0;
-            let lowStockCount = 0;
+            let totalInVal = 0, totalStockVal = 0, lowStockCount = 0;
             
             inventoryData.forEach(item => {
                 let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
-                let inVal = stock * (item.unitPrice || 0) * 1.2; 
-                let stockVal = stock * (item.unitPrice || 0);
-                
-                totalInVal += inVal;
-                totalStockVal += stockVal;
-                
-                if (stock <= item.min) lowStockCount++;
+                if (stock > 0 || site === "all") { // นับเฉพาะที่มีของ
+                    let inVal = stock * (item.unitPrice || 0) * 1.2; 
+                    let stockVal = stock * (item.unitPrice || 0);
+                    totalInVal += inVal;
+                    totalStockVal += stockVal;
+                    if (stock <= item.min) lowStockCount++;
+                }
             });
 
-            // หาจำนวนที่ถูกเบิกใช้วันนี้
             const todayStr = new Date().toISOString().split('T')[0];
-            let todayUsageCount = 0;
-            let pendingCount = 0;
+            let todayUsageCount = 0, pendingCount = 0;
 
             transactionsDatabase.forEach(t => {
                 const matchSite = (site === "all" || t.site === site);
                 if (matchSite) {
                     if (t.status === 'รออนุมัติ') pendingCount++;
-                    if (t.date === todayStr && t.mode === 'out' && t.status === 'อนุมัติ') {
-                        todayUsageCount++;
-                    }
+                    if (t.date === todayStr && t.mode === 'out' && t.status === 'อนุมัติ') todayUsageCount++;
                 }
             });
 
-            // อัปเดต HTML 
             document.getElementById("card-proj-val").innerText = "฿" + totalInVal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
             document.getElementById("card-proj-name").innerText = siteNameDisplay;
             document.getElementById("card-stock-val").innerText = "฿" + totalStockVal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
@@ -689,39 +672,28 @@
 
         function updateCharts() {
             const site = document.getElementById("siteFilter").value;
-            
-            // 1. อัปเดต Pie Chart (แยกตามหมวดหมู่)
             let catData = {};
             inventoryData.forEach(item => {
                 let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
                 let val = stock * (item.unitPrice || 0);
-                if (val > 0) {
-                    catData[item.category] = (catData[item.category] || 0) + val;
-                }
+                if (val > 0) catData[item.category] = (catData[item.category] || 0) + val;
             });
             
             if (categoryPieChartInstance) {
                 let labels = Object.keys(catData);
                 let values = Object.values(catData);
-                
-                // ถ้าไม่มีข้อมูล ให้แสดงเป็นกราฟสีเทา
                 if (labels.length === 0) { 
-                    labels = ['ไม่มีข้อมูลมูลค่า']; 
-                    values = [1]; 
+                    labels = ['ไม่มีข้อมูลมูลค่า']; values = [1]; 
                     categoryPieChartInstance.data.datasets[0].backgroundColor = ['#e2e8f0']; 
                 } else { 
                     categoryPieChartInstance.data.datasets[0].backgroundColor = ['#0f172a', '#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6']; 
                 }
-                
                 categoryPieChartInstance.data.labels = labels;
                 categoryPieChartInstance.data.datasets[0].data = values;
                 categoryPieChartInstance.update();
             }
         }
 
-        // =====================================
-        // ฟังก์ชัน UI ย่อยด้านล่างนี้ (คัดกรองตาม Site Filter ได้แล้ว)
-        // =====================================
         function syncSiteFilter(selectedSite) { 
             document.getElementById("siteFilter").value = selectedSite; 
             renderAll(); 
@@ -792,9 +764,16 @@
             const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
             const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
             const site = document.getElementById("siteFilter").value;
-            let data = term ? inventoryData.filter(i => i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term)) : inventoryData;
             
-            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500">ไม่พบข้อมูล</td></tr>`; return; }
+            // กรองทั้งจากช่องค้นหา และจาก Site Filter (ซ่อนของที่ไม่มีสต็อก)
+            let data = inventoryData.filter(i => {
+                let stock = site === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[site] || 0);
+                let matchSearch = term === "" || i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term);
+                let matchSite = site === "all" || stock > 0; // แสดงเฉพาะที่มีของ
+                return matchSearch && matchSite;
+            });
+            
+            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 font-bold">ไม่พบรายการวัสดุในโครงการนี้</td></tr>`; return; }
             
             let html = `
                 <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b">
@@ -811,7 +790,12 @@
                 </thead>
             `;
 
-            data.slice(0, 200).forEach(item => { 
+            // เรียงลำดับจากสต็อกมากไปน้อยก่อนโชว์
+            data.sort((a,b) => {
+                let sA = site === "all" ? a.siteStocks["all"] : (a.siteStocks[site] || 0);
+                let sB = site === "all" ? b.siteStocks["all"] : (b.siteStocks[site] || 0);
+                return sB - sA;
+            }).slice(0, 200).forEach(item => { 
                 let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
                 let isLow = stock <= item.min;
                 let statusSpan = isLow ? `<span class="bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded text-[11px]">สต็อกต่ำ</span>` : `<span class="text-emerald-600 font-bold text-[11px]">● ปกติ</span>`;
@@ -826,7 +810,9 @@
             
             let lowStockItems = inventoryData.filter(i => {
                 let stock = site === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[site] || 0);
-                return stock <= i.min;
+                // กรองให้แจ้งเตือนเฉพาะของที่มีสต็อกมากกว่า 0 แต่ต่ำกว่าจุด Safety หรือเป็นภาพรวมบริษัท
+                if (site === "all") return stock <= i.min;
+                return stock > 0 && stock <= i.min; 
             });
             
             document.getElementById("card-low-stock").innerText = `${lowStockItems.length} รายการ`;
@@ -846,7 +832,7 @@
             let totalCompanyInVal = 0, totalCompanyStockVal = 0;
             let siteTotals = {
                 "สโตร์กลาง": { stockVal: 0, inVal: 0 }, "ทวีวงษ์ New factory": { stockVal: 0, inVal: 0 },
-                "บุญพา": { stockVal: 0, inVal: 0 }, "บ้านคุณบี": { stockVal: 0, inVal: 0 },
+                "บุพา": { stockVal: 0, inVal: 0 }, "บ้านคุณบี": { stockVal: 0, inVal: 0 },
                 "บ้านคุณอรรถา": { stockVal: 0, inVal: 0 }, "KVG อาคารเก็บสินค้า": { stockVal: 0, inVal: 0 }, "ศิริชัย": { stockVal: 0, inVal: 0 }
             };
 
@@ -879,7 +865,7 @@
                 "all": { name: "รวมภาพรวมบริษัท", icon: "🌐", inVal: "฿" + totalCompanyInVal.toLocaleString(), stock: "฿" + totalCompanyStockVal.toLocaleString(), usedVal: "฿" + (totalCompanyInVal - totalCompanyStockVal).toLocaleString() },
                 "ทวีวงษ์ New factory": { name: "ทวีวงษ์ New factory", icon: "🏗️", inVal: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
                 "สโตร์กลาง": { name: "สโตร์กลาง", icon: "🏢", inVal: "฿" + (siteTotals["สโตร์กลาง"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["สโตร์กลาง"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
-                "บุญพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุญพา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บุญพา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
+                "บุพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุพา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บุพา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
                 "บ้านคุณบี": { name: "บ้านคุณบี", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณบี"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณบี"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
                 "บ้านคุณอรรถา": { name: "บ้านคุณอรรถา", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณอรรถา"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["บ้านคุณอรรถา"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
                 "ศิริชัย": { name: "ศิริชัย", icon: "🏗️", inVal: "฿" + (siteTotals["ศิริชัย"]?.inVal || 0).toLocaleString(), stock: "฿" + (siteTotals["ศิริชัย"]?.stockVal || 0).toLocaleString(), usedVal: "฿0" },
@@ -890,7 +876,7 @@
             renderAll(); 
             openProjectDrilldown(currentDrilldownSite);
         }
-        
+
         function populateModalMaterials() { 
             const select = document.getElementById("modalItemSelect"); if (!select) return;
             let optionsHTML = '<option value="" disabled selected>-- พิมพ์ค้นหาวัสดุ --</option>';
@@ -919,10 +905,23 @@
             renderProjectCardsGrid(); renderDrilldownTable();
         }
 
+        // ตารางแยกรายชิ้นในเมนู "มูลค่าโครงการ" (ซ่อนของไม่มีสต็อก)
         function renderDrilldownTable() {
             const tbody = document.getElementById("projectDrilldownTableBody"); if (!tbody) return;
             let html = '';
-            inventoryData.slice(0, 200).forEach(item => {
+            
+            let data = inventoryData.filter(i => {
+                let stock = currentDrilldownSite === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[currentDrilldownSite] || 0);
+                return currentDrilldownSite === "all" || stock > 0;
+            });
+            
+            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 font-bold">ไม่มีรายการวัสดุในโครงการนี้</td></tr>`; return; }
+
+            data.sort((a,b) => {
+                let sA = currentDrilldownSite === "all" ? a.siteStocks["all"] : (a.siteStocks[currentDrilldownSite] || 0);
+                let sB = currentDrilldownSite === "all" ? b.siteStocks["all"] : (b.siteStocks[currentDrilldownSite] || 0);
+                return sB - sA;
+            }).slice(0, 200).forEach(item => {
                 let stock = currentDrilldownSite === "all" ? item.siteStocks["all"] : (item.siteStocks[currentDrilldownSite] || 0);
                 let totalVal = stock * item.unitPrice;
                 html += `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-right font-bold text-slate-900">${stock.toLocaleString()}</td><td class="py-3 px-4 text-right font-mono text-slate-400 text-xs">฿${item.unitPrice.toLocaleString()}</td><td class="py-3 px-4 text-right font-bold text-emerald-700 font-mono">฿${totalVal.toLocaleString()}</td></tr>`;
@@ -940,7 +939,6 @@
             let htmlOut = '', htmlIn = '', htmlAdj = '';
             
             transactionsDatabase.forEach(item => {
-                // คัดกรองให้ประวัติแสดงตามที่เลือกใน Dropdown หลัก (Filter)
                 if (site !== "all" && item.site !== site) return;
 
                 let b = item.status === 'รออนุมัติ' ? `<span class="bg-amber-100 text-amber-800 text-[11px] px-2 rounded font-bold">⏳ รออนุมัติ</span>` : (item.status === 'อนุมัติ' ? `<span class="bg-emerald-100 text-emerald-800 text-[11px] px-2 rounded font-bold">✓ อนุมัติ</span>` : `<span class="bg-rose-100 text-rose-800 text-[11px] px-2 rounded font-bold">✗ ปฏิเสธ</span>`);
@@ -951,9 +949,9 @@
                 if (item.mode === 'adj') htmlAdj += row;
             });
             
-            if (outTbody) outTbody.innerHTML = htmlOut || `<tr><td colspan="7" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>`;
-            if (inTbody) inTbody.innerHTML = htmlIn || `<tr><td colspan="7" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>`;
-            if (adjTbody) adjTbody.innerHTML = htmlAdj || `<tr><td colspan="7" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>`;
+            if (outTbody) outTbody.innerHTML = htmlOut || `<tr><td colspan="7" class="text-center py-6 text-slate-400 font-bold">ไม่มีข้อมูล</td></tr>`;
+            if (inTbody) inTbody.innerHTML = htmlIn || `<tr><td colspan="7" class="text-center py-6 text-slate-400 font-bold">ไม่มีข้อมูล</td></tr>`;
+            if (adjTbody) adjTbody.innerHTML = htmlAdj || `<tr><td colspan="7" class="text-center py-6 text-slate-400 font-bold">ไม่มีข้อมูล</td></tr>`;
         }
 
         function renderApprovalTable() {
