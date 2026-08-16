@@ -517,14 +517,24 @@
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
+            // อัปเดตจำนวนคงเหลือเมื่อเปลี่ยนวัสดุ หรือ เปลี่ยนไซต์งาน
             document.addEventListener('change', function(e) {
-                if (e.target && (e.target.id === 'modalItemSelect' || e.target.id === 'modalSiteSelect')) {
+                if (e.target && e.target.id === 'modalSiteSelect') {
+                    // ถ้าเปลี่ยนไซต์งาน ให้สร้าง Dropdown วัสดุใหม่เพื่อให้เลขคงเหลือตรงกับไซต์
+                    const selectedSite = e.target.value;
+                    populateModalMaterials(selectedSite);
+                    
+                    // กระตุ้นให้อัปเดตป้ายสีเหลืองด้วย
+                    document.getElementById("modalItemSelect").dispatchEvent(new Event('change'));
+                }
+                else if (e.target && e.target.id === 'modalItemSelect') {
+                    // ถ้าเปลี่ยนวัสดุ ให้อัปเดตป้ายเหลืองมุมขวา
                     const selectedId = document.getElementById("modalItemSelect").value;
                     const selectedSite = document.getElementById("modalSiteSelect").value;
                     const item = inventoryData.find(i => i.id === selectedId);
                     
                     if (item) {
-                        let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? item.siteStocks["all"] : item.siteStocks[selectedSite];
+                        let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? (item.siteStocks["all"] || 0) : (item.siteStocks[selectedSite] || 0);
                         document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${stock.toLocaleString()} ${item.unit}`;
                     } else {
                         document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
@@ -877,11 +887,21 @@
             openProjectDrilldown(currentDrilldownSite);
         }
 
-        function populateModalMaterials() { 
+        // ฟังก์ชันสร้าง Dropdown โดยดึงเลขสต็อกตามไซต์ที่เลือก
+        function populateModalMaterials(site = "all") { 
             const select = document.getElementById("modalItemSelect"); if (!select) return;
+            
+            // จำค่าที่เลือกไว้ก่อนหน้า
+            const currentValue = select.value;
+            
             let optionsHTML = '<option value="" disabled selected>-- พิมพ์ค้นหาวัสดุ --</option>';
-            inventoryData.forEach(item => { optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${item.siteStocks["all"]} ${item.unit})</option>`; });
+            inventoryData.forEach(item => { 
+                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
+                optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${stock.toLocaleString()} ${item.unit})</option>`; 
+            });
             select.innerHTML = optionsHTML; 
+            
+            if(currentValue) select.value = currentValue;
         }
 
         function toggleTransactionSubmenu() { document.getElementById("transSubmenu").classList.toggle("hidden"); }
@@ -999,13 +1019,19 @@
             document.getElementById("modalPerson").value = "";
             document.getElementById("modalNote").value = "";
 
-            document.getElementById("transModal").classList.remove("hidden"); document.getElementById("transModal").classList.add("flex"); 
+            document.getElementById("transModal").classList.remove("hidden"); 
+            document.getElementById("transModal").classList.add("flex"); 
             
             setTimeout(() => {
+                // เซ็ต Dropdown ให้เลขคงเหลือตรงกับไซต์ที่เลือกอยู่ใน Modal ปัจจุบัน
+                const siteSelect = document.getElementById("modalSiteSelect");
+                populateModalMaterials(siteSelect.value);
+                
                 const itemSelect = document.getElementById("modalItemSelect");
                 if (itemSelect.options.length > 0) itemSelect.dispatchEvent(new Event('change'));
             }, 100);
         }
+        
         function closeModal() { document.getElementById("transModal").classList.add("hidden"); document.getElementById("transModal").classList.remove("flex"); }
         function showToast(msg) { const toast = document.getElementById("toast"); document.getElementById("toastMessage").innerText = msg; toast.classList.remove("hidden"); toast.classList.add("flex"); setTimeout(() => { toast.classList.add("hidden"); toast.classList.remove("flex"); }, 3000); }
 
