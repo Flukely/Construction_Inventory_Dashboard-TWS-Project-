@@ -468,7 +468,7 @@
 
     <!-- JavaScript Engine -->
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyXZ4u_GNJ_hO9VBuka4grZaAsK0OwPa159JPzwpqAPY2AQcyawc9opviEAEjUmCQ4PKw/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBCfe3nXoc0JEPWd90x0UngZPlvZZXaFG66KYC-Gour9DVpAqJbRUdI5dIZ98xMSyA/exec"; 
 
         let currentDrilldownSite = "all";
         let inventoryData = [];
@@ -479,14 +479,18 @@
         // ตัวแปรเก็บ Instance ของ Chart
         let usageTrendChartInstance = null;
         let categoryPieChartInstance = null;
-        let disbursementMonthlyChartInstance = null;
-        let receivingMonthlyChartInstance = null;
-        let companyOverviewChartInstance = null;
 
+        // ฟังก์ชันเปิด/ปิด หน้าจอโหลด (Loading Overlay)
         function toggleLoading(show) {
             const overlay = document.getElementById("loadingOverlay");
-            if (show) { overlay.classList.remove("hidden"); overlay.classList.add("flex"); } 
-            else { overlay.classList.add("hidden"); overlay.classList.remove("flex"); }
+            // ให้แสดง Loading ก็ต่อเมื่อกำลังอยู่ที่หน้า dashboard หลักเท่านั้น
+            if (show && currentActiveView === 'dashboard') { 
+                overlay.classList.remove("hidden"); 
+                overlay.classList.add("flex"); 
+            } else { 
+                overlay.classList.add("hidden"); 
+                overlay.classList.remove("flex"); 
+            }
         }
 
         // ฟังก์ชันดึงข้อมูล API 
@@ -511,7 +515,7 @@
                 }
             }, 1000);
             
-            fetchSheetData();
+            fetchSheetData(); // โหลดหน้าแรกจะมี Loading ขึ้น
             updateActiveNav('nav-dashboard'); 
             
             // อัปเดตจำนวนคงเหลือเมื่อเปลี่ยนวัสดุ หรือ เปลี่ยนไซต์งานใน Modal
@@ -562,12 +566,6 @@
                                 stocks: {} 
                             };
                         }
-                        // วัสดุ 1 รายการอาจถูกบันทึกหลายแถว (แยกตามโครงการ) และบางแถวอาจยังไม่ได้กรอกราคา
-                        // ถ้าราคาที่เก็บไว้ตอนนี้เป็น 0 แต่แถวนี้มีราคา ให้ใช้ราคาจากแถวนี้แทน
-                        let rowPrice = Number(row.Unit_Price) || 0;
-                        if (!rawSheetData[code].price && rowPrice) {
-                            rawSheetData[code].price = rowPrice;
-                        }
                         rawSheetData[code].stocks[row.Location_Project] = Number(row.Current_Qty) || 0;
                     });
                     
@@ -596,19 +594,22 @@
                     onDataLoaded(rawSheetData);
                 } else { 
                     console.error("Error loading data", result); 
-                    alert("ไม่สามารถโหลดข้อมูลได้: " + (result?.message || "Unknown Error"));
                 }
             } catch (e) { 
                 console.error("Load Data Error:", e); 
             } finally { 
-                if (!isSilent) toggleLoading(false); 
+                toggleLoading(false); // ปิดเสมอเมื่อทำเสร็จ 
             }
         }
 
         // 2. บันทึกคำร้อง
         function handleTransactionSubmit(e) {
             e.preventDefault();
-            toggleLoading(true); 
+            // ให้ปุ่มใน Modal กลายเป็นคำว่า "กำลังส่งข้อมูล"
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerText;
+            submitBtn.innerText = "กำลังส่งข้อมูล...";
+            submitBtn.disabled = true;
 
             const currentMode = document.getElementById("formCurrentMode").value; 
             let type = currentMode.toUpperCase();
@@ -631,30 +632,34 @@
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 closeModal();
                 showToast("บันทึกคำร้องสำเร็จ! กำลังซิงค์ข้อมูล...");
+                // สั่งซิงค์ข้อมูลเบื้องหลัง โดยไม่ให้มี Loading บังจอ
                 setTimeout(() => { fetchSheetData(true); }, 1500);
             }).catch(err => {
-                toggleLoading(false);
                 alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+            }).finally(() => {
+                submitBtn.innerText = originalText; 
+                submitBtn.disabled = false;
             });
         }
 
         // 3. อนุมัติ / ปฏิเสธ
         function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
-            toggleLoading(true);
 
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
+            showToast("กำลังประมวลผลการอนุมัติ...");
             
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 setTimeout(() => {
                     showToast("อัปเดตสถานะสำเร็จ!");
+                    // ซิงค์เบื้องหลัง ไม่ให้ Loading บังจอ
                     fetchSheetData(true);
                 }, 1500);
-            }).catch(err => { toggleLoading(false); alert("เกิดข้อผิดพลาดในการเชื่อมต่อ"); });
+            }).catch(err => { alert("เกิดข้อผิดพลาดในการเชื่อมต่อ"); });
         }
 
         // =====================================
-        // ฟังก์ชันประมวลผลเพื่อแสดงขึ้นหน้าจอ (ป้องกัน Error ตัวเลข)
+        // ฟังก์ชันประมวลผลเพื่อแสดงขึ้นหน้าจอ 
         // =====================================
         function onDataLoaded(rawSheetData) {
             inventoryData = [];
@@ -708,7 +713,6 @@
             // ป้องกันให้ฟังก์ชัน Render พังตัวเดียว ไม่พาทั้งระบบล่ม
             try { updateDashboardCards(); } catch(e){ console.error(e); }
             try { updateCharts(); } catch(e){ console.error(e); }
-            try { updateReportCharts(); } catch(e){ console.error(e); }
             try { renderInventoryTable(); } catch(e){ console.error(e); }
             try { renderLowStockAlertTable(); } catch(e){ console.error(e); }
             try { renderProjectCardsGrid(); } catch(e){ console.error(e); }
@@ -746,7 +750,6 @@
                 }
             });
 
-            // ป้องกัน Error จาก DOM Element หาย
             const safelySetText = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; }
             
             safelySetText("card-proj-val", "฿" + totalInVal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}));
@@ -769,18 +772,6 @@
             
             const ctx2 = document.getElementById('categoryPieChart');
             if (ctx2) categoryPieChartInstance = new Chart(ctx2.getContext('2d'), { type: 'doughnut', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ data: [1], backgroundColor: ['#cbd5e1'] }] }, options: { responsive: true, maintainAspectRatio: false } });
-
-            const ctx3 = document.getElementById('disbursementMonthlyChart');
-            if (ctx3) disbursementMonthlyChartInstance = new Chart(ctx3.getContext('2d'), { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'มูลค่าเบิกจ่าย (฿)', data: [0], backgroundColor: '#f59e0b' }] }, options: { responsive: true, maintainAspectRatio: false } });
-
-            const ctx4 = document.getElementById('receivingMonthlyChart');
-            if (ctx4) receivingMonthlyChartInstance = new Chart(ctx4.getContext('2d'), { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'มูลค่ารับเข้า (฿)', data: [0], backgroundColor: '#10b981' }] }, options: { responsive: true, maintainAspectRatio: false } });
-
-            const ctx5 = document.getElementById('companyOverviewChart');
-            if (ctx5) companyOverviewChartInstance = new Chart(ctx5.getContext('2d'), { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [
-                { label: 'มูลค่ารับเข้า (฿)', data: [0], backgroundColor: '#0f172a' },
-                { label: 'มูลค่าคงเหลือ (฿)', data: [0], backgroundColor: '#f59e0b' }
-            ] }, options: { responsive: true, maintainAspectRatio: false } });
         }
 
         function updateCharts() {
@@ -839,62 +830,6 @@
             }
         }
 
-        // อัปเดตกราฟหน้า "สรุปรายงาน" (รายเดือน) — เบิกจ่าย / รับเข้า / ภาพรวมบริษัท
-        function updateReportCharts() {
-            if (typeof Chart === 'undefined') return;
-            const site = document.getElementById("siteFilter").value;
-
-            // เตรียม label 6 เดือนล่าสุด (YYYY-MM) เรียงเก่า -> ใหม่
-            let months = [];
-            let today = new Date();
-            for (let i = 5; i >= 0; i--) {
-                let d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-                let key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                months.push(key);
-            }
-            let monthLabels = months.map(m => {
-                let [y, mo] = m.split('-');
-                return `${mo}/${y.slice(2)}`;
-            });
-
-            let outValByMonth = {}, inValByMonth = {};
-            months.forEach(m => { outValByMonth[m] = 0; inValByMonth[m] = 0; });
-
-            transactionsDatabase.forEach(t => {
-                if (site !== "all" && t.site !== site) return;
-                if (t.status !== 'อนุมัติ') return;
-                let monthKey = String(t.date || "").slice(0, 7);
-                if (!months.includes(monthKey)) return;
-
-                let matchItem = inventoryData.find(i => i.id === t.itemId);
-                let price = matchItem ? (matchItem.unitPrice || 0) : 0;
-                let val = (Number(t.qty) || 0) * price;
-
-                if (t.mode === 'out') outValByMonth[monthKey] += val;
-                else if (t.mode === 'in') inValByMonth[monthKey] += val * 1.2;
-            });
-
-            let outValues = months.map(m => Math.round(outValByMonth[m]));
-            let inValues = months.map(m => Math.round(inValByMonth[m]));
-
-            if (disbursementMonthlyChartInstance) {
-                disbursementMonthlyChartInstance.data.labels = monthLabels;
-                disbursementMonthlyChartInstance.data.datasets[0].data = outValues;
-                disbursementMonthlyChartInstance.update();
-            }
-            if (receivingMonthlyChartInstance) {
-                receivingMonthlyChartInstance.data.labels = monthLabels;
-                receivingMonthlyChartInstance.data.datasets[0].data = inValues;
-                receivingMonthlyChartInstance.update();
-            }
-            if (companyOverviewChartInstance) {
-                companyOverviewChartInstance.data.labels = monthLabels;
-                companyOverviewChartInstance.data.datasets[0].data = inValues;
-                companyOverviewChartInstance.data.datasets[1].data = outValues;
-                companyOverviewChartInstance.update();
-            }
-        }
-
         // =====================================
         // ฟังก์ชัน UI ย่อย (ตารางต่างๆ)
         // =====================================
@@ -918,7 +853,6 @@
         function renderAll() { 
             try { updateDashboardCards(); } catch(e){}
             try { updateCharts(); } catch(e){}
-            try { updateReportCharts(); } catch(e){}
             try { renderInventoryTable(); } catch(e){}
             try { renderLowStockAlertTable(); } catch(e){}
             try { renderProjectCardsGrid(); } catch(e){}
@@ -940,9 +874,6 @@
             else if(viewName === 'trans-adj') navId = 'nav-trans-adj';
             else if(viewName === 'approvals') navId = 'nav-approvals';
             else if(viewName === 'projects') navId = 'nav-projects';
-            else if(viewName === 'rep-out') navId = 'nav-rep-out';
-            else if(viewName === 'rep-in') navId = 'nav-rep-in';
-            else if(viewName === 'rep-overview') navId = 'nav-rep-overview';
             
             updateActiveNav(navId);
             if(typeof lucide !== 'undefined') lucide.createIcons(); 
