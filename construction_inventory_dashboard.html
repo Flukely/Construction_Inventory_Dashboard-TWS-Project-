@@ -18,9 +18,29 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .project-card-active { border-color: #f59e0b !important; background-color: #fffbeb !important; box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.15); }
+        
+        /* ตัดคำใน Dropdown ไม่ให้ล้น */
+        .select-truncate {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* หน้าจอโหลด (Loading Overlay) */
+        #loadingOverlay {
+            transition: opacity 0.3s ease;
+        }
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col md:flex-row">
+
+    <!-- Loading Overlay (เต็มจอ) -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] hidden items-center justify-center flex-col">
+        <i data-lucide="loader-2" class="w-12 h-12 text-amber-500 animate-spin mb-4"></i>
+        <h2 class="text-xl font-bold text-white mb-1">กำลังประมวลผล...</h2>
+        <p class="text-sm text-slate-300">กรุณารอสักครู่ ระบบกำลังเชื่อมต่อกับฐานข้อมูล</p>
+    </div>
 
     <!-- Sidebar Navigation -->
     <aside class="w-full md:w-64 bg-[#0f172a] text-white flex-shrink-0 flex flex-col justify-between">
@@ -132,7 +152,7 @@
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar relative">
         
         <!-- Header Top Bar -->
         <header class="bg-white border-b border-slate-200 sticky top-0 z-20 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -197,7 +217,7 @@
             <!-- Charts Section -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-2">แนวโน้มการเบิกใช้ปูนและเหล็ก (7 วันล่าสุด)</h3>
+                    <h3 class="font-bold text-slate-800 mb-2">แนวโน้มการเบิกใช้วัสดุ (7 วันล่าสุด)</h3>
                     <div class="h-64 relative"><canvas id="usageTrendChart"></canvas></div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -245,7 +265,7 @@
             </div>
         </div>
 
-        <!-- VIEW: มูลค่าวัสดุ/โครงการ (พร้อมการ์ดครบทุกโครงการ) -->
+        <!-- VIEW: มูลค่าวัสดุ/โครงการ -->
         <div id="view-projects" class="p-6 space-y-6 hidden">
             <div>
                 <div class="flex items-center justify-between mb-3">
@@ -297,7 +317,7 @@
             </div>
         </div>
 
-        <!-- VIEW SUB-1: 1. เบิกจ่ายวัสดุ -->
+        <!-- VIEW SUB-1: เบิกจ่าย -->
         <div id="view-trans-out" class="p-6 space-y-6 hidden">
             <div class="bg-white rounded-2xl border p-6 flex items-center justify-between shadow-sm">
                 <div>
@@ -309,22 +329,14 @@
             <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-700 border-b">
-                        <tr>
-                            <th class="py-3 px-4">วันที่</th>
-                            <th class="py-3 px-4">เลขที่ใบเบิก</th>
-                            <th class="py-3 px-4">โครงการ</th>
-                            <th class="py-3 px-4">รายการวัสดุ</th>
-                            <th class="py-3 px-4 text-right">จำนวน</th>
-                            <th class="py-3 px-4">ผู้ขอเบิก</th>
-                            <th class="py-3 px-4 text-center">สถานะ</th>
-                        </tr>
+                        <tr><th class="py-3 px-4">วันที่</th><th class="py-3 px-4">เลขที่ใบเบิก</th><th class="py-3 px-4">โครงการ</th><th class="py-3 px-4">รายการวัสดุ</th><th class="py-3 px-4 text-right">จำนวน</th><th class="py-3 px-4">ผู้ขอเบิก</th><th class="py-3 px-4 text-center">สถานะ</th></tr>
                     </thead>
                     <tbody id="transOutTableBody" class="divide-y"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- VIEW SUB-2: 2. รับเข้าวัสดุ / สั่งซื้อ -->
+        <!-- VIEW SUB-2: รับเข้า -->
         <div id="view-trans-in" class="p-6 space-y-6 hidden">
             <div class="bg-white rounded-2xl border p-6 flex items-center justify-between shadow-sm">
                 <div>
@@ -336,22 +348,14 @@
             <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-700 border-b">
-                        <tr>
-                            <th class="py-3 px-4">วันที่</th>
-                            <th class="py-3 px-4">เลขที่ PO</th>
-                            <th class="py-3 px-4">โครงการ</th>
-                            <th class="py-3 px-4">รายการวัสดุ</th>
-                            <th class="py-3 px-4 text-right">จำนวน</th>
-                            <th class="py-3 px-4">ผู้จำหน่าย</th>
-                            <th class="py-3 px-4 text-center">สถานะ</th>
-                        </tr>
+                        <tr><th class="py-3 px-4">วันที่</th><th class="py-3 px-4">เลขที่ PO</th><th class="py-3 px-4">โครงการ</th><th class="py-3 px-4">รายการวัสดุ</th><th class="py-3 px-4 text-right">จำนวน</th><th class="py-3 px-4">ผู้จำหน่าย</th><th class="py-3 px-4 text-center">สถานะ</th></tr>
                     </thead>
                     <tbody id="transInTableBody" class="divide-y"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- VIEW SUB-3: 3. ปรับปรุงเพิ่ม / ลด -->
+        <!-- VIEW SUB-3: ปรับปรุง -->
         <div id="view-trans-adj" class="p-6 space-y-6 hidden">
             <div class="bg-white rounded-2xl border p-6 flex items-center justify-between shadow-sm">
                 <div>
@@ -363,15 +367,7 @@
             <div class="bg-white rounded-2xl border overflow-hidden shadow-sm">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-700 border-b">
-                        <tr>
-                            <th class="py-3 px-4">วันที่</th>
-                            <th class="py-3 px-4">เลขที่เอกสาร</th>
-                            <th class="py-3 px-4">ประเภท</th>
-                            <th class="py-3 px-4">โครงการ</th>
-                            <th class="py-3 px-4">รายการวัสดุ</th>
-                            <th class="py-3 px-4 text-right">จำนวน</th>
-                            <th class="py-3 px-4 text-center">สถานะ</th>
-                        </tr>
+                        <tr><th class="py-3 px-4">วันที่</th><th class="py-3 px-4">เลขที่เอกสาร</th><th class="py-3 px-4">ประเภท</th><th class="py-3 px-4">โครงการ</th><th class="py-3 px-4">รายการวัสดุ</th><th class="py-3 px-4 text-right">จำนวน</th><th class="py-3 px-4 text-center">สถานะ</th></tr>
                     </thead>
                     <tbody id="transAdjTableBody" class="divide-y"></tbody>
                 </table>
@@ -387,7 +383,7 @@
             <div class="bg-white rounded-2xl border overflow-hidden"><table class="w-full text-left text-sm"><tbody id="approvalTableBody" class="divide-y"></tbody></table></div>
         </div>
 
-        <!-- VIEW: สรุปรายงาน 1, 2, 3 -->
+        <!-- VIEW: สรุปรายงาน -->
         <div id="view-rep-out" class="p-6 space-y-6 hidden">
             <div class="bg-white rounded-2xl border p-6"><h3 class="text-xl font-bold">1. สรุปรายงานการเบิกจ่ายวัสดุ</h3><div class="h-64 mt-4 relative"><canvas id="disbursementMonthlyChart"></canvas></div></div>
         </div>
@@ -439,7 +435,8 @@
                         <label class="block text-xs font-semibold text-slate-700">เลือกรายการวัสดุ *</label>
                         <span id="liveStockBadge" class="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">คงเหลือ: 0</span>
                     </div>
-                    <select id="modalItemSelect" required class="w-full border p-2.5 text-sm rounded-xl font-medium"></select>
+                    <!-- เพิ่มคลาส select-truncate ป้องกันชื่อล้นจอ -->
+                    <select id="modalItemSelect" required class="w-full border p-2.5 text-sm rounded-xl font-medium select-truncate"></select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -479,8 +476,7 @@
 
     <!-- JavaScript Engine -->
     <script>
-        // URL นี้เป็นตัวล่าสุด
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBCfe3nXoc0JEPWd90x0UngZPlvZZXaFG66KYC-Gour9DVpAqJbRUdI5dIZ98xMSyA/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyXZ4u_GNJ_hO9VBuka4grZaAsK0OwPa159JPzwpqAPY2AQcyawc9opviEAEjUmCQ4PKw/exec"; 
 
         let currentDrilldownSite = "all";
         let inventoryData = [];
@@ -491,19 +487,25 @@
         // ตัวแปรเก็บ Instance ของ Chart
         let usageTrendChartInstance = null;
         let categoryPieChartInstance = null;
-        let disbursementMonthlyChartInstance = null;
-        let receivingMonthlyChartInstance = null;
-        let companyOverviewChartInstance = null;
 
-        // ฟังก์ชันดึงข้อมูลแบบปกติตาม Google Apps Script (ContentService)
+        // ฟังก์ชันเปิด/ปิด หน้าจอโหลด (Loading Overlay)
+        function toggleLoading(show) {
+            const overlay = document.getElementById("loadingOverlay");
+            if (show) {
+                overlay.classList.remove("hidden");
+                overlay.classList.add("flex");
+            } else {
+                overlay.classList.add("hidden");
+                overlay.classList.remove("flex");
+            }
+        }
+
+        // ฟังก์ชันดึงข้อมูล API 
         async function fetchAPI(url, options = {}) {
             try {
                 const response = await fetch(url, options);
-                if (!response.ok) {
-                    console.error('API response error', response.status);
-                }
-                const result = await response.json();
-                return result;
+                if (!response.ok) console.error('API response error', response.status);
+                return await response.json();
             } catch (error) {
                 console.error("fetchAPI Error:", error);
                 throw error;
@@ -513,44 +515,34 @@
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
             initCharts();
-            initReportCharts();
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
-            // อัปเดตจำนวนคงเหลือเมื่อเปลี่ยนวัสดุ หรือ เปลี่ยนไซต์งาน
+            // อัปเดตจำนวนคงเหลือแบบเรียลไทม์
             document.addEventListener('change', function(e) {
-                if (e.target && e.target.id === 'modalSiteSelect') {
-                    // ถ้าเปลี่ยนไซต์งาน ให้สร้าง Dropdown วัสดุใหม่เพื่อให้เลขคงเหลือตรงกับไซต์
-                    const selectedSite = e.target.value;
-                    populateModalMaterials(selectedSite);
-                    
-                    // กระตุ้นให้อัปเดตป้ายสีเหลืองด้วย
-                    document.getElementById("modalItemSelect").dispatchEvent(new Event('change'));
-                }
-                else if (e.target && e.target.id === 'modalItemSelect') {
-                    // ถ้าเปลี่ยนวัสดุ ให้อัปเดตป้ายเหลืองมุมขวา
-                    const selectedId = document.getElementById("modalItemSelect").value;
-                    const selectedSite = document.getElementById("modalSiteSelect").value;
-                    const item = inventoryData.find(i => i.id === selectedId);
-                    
-                    if (item) {
-                        let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? (item.siteStocks["all"] || 0) : (item.siteStocks[selectedSite] || 0);
-                        document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${stock.toLocaleString()} ${item.unit}`;
-                    } else {
-                        document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
-                    }
+                if (e.target && (e.target.id === 'modalItemSelect' || e.target.id === 'modalSiteSelect')) {
+                    updateLiveStockBadge();
                 }
             });
         });
 
-        async function fetchSheetData(isSilent = false) {
-            if (!isSilent) {
-                const loaderHTML = `<tr><td colspan="9" class="text-center py-8"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2"></i><p class="text-slate-500 text-xs font-semibold">กำลังซิงค์ข้อมูลแบบ Real-time...</p></td></tr>`;
-                ['inventoryTableBody', 'transOutTableBody', 'transInTableBody', 'transAdjTableBody', 'approvalTableBody', 'projectDrilldownTableBody'].forEach(id => {
-                    const el = document.getElementById(id); if(el) el.innerHTML = loaderHTML;
-                });
-                lucide.createIcons();
+        // แยกฟังก์ชันเพื่ออัปเดตป้ายเหลือง ให้เรียกใช้ได้ตลอดเวลา
+        function updateLiveStockBadge() {
+            const selectedId = document.getElementById("modalItemSelect").value;
+            const selectedSite = document.getElementById("modalSiteSelect").value;
+            const item = inventoryData.find(i => i.id === selectedId);
+            
+            if (item) {
+                let stock = (selectedSite === "all" || !item.siteStocks[selectedSite]) ? (item.siteStocks["all"] || 0) : (item.siteStocks[selectedSite] || 0);
+                document.getElementById("liveStockBadge").innerText = `คงเหลือ: ${stock.toLocaleString()} ${item.unit}`;
+            } else {
+                document.getElementById("liveStockBadge").innerText = `คงเหลือ: 0`;
             }
+        }
+
+        // 1. โหลดข้อมูลหลักแบบ Real-time
+        async function fetchSheetData(isSilent = false) {
+            if (!isSilent) toggleLoading(true);
 
             try {
                 const url = `${WEB_APP_URL}?action=load&t=${new Date().getTime()}`;
@@ -579,16 +571,15 @@
                     }).reverse();
 
                     onDataLoaded(rawSheetData);
-                } else { console.error("Error loading data", result); }
+                }
             } catch (e) { console.error("Load Data Error:", e); }
+            finally { if (!isSilent) toggleLoading(false); }
         }
 
+        // 2. บันทึกคำร้อง 
         function handleTransactionSubmit(e) {
             e.preventDefault();
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const originalText = submitBtn.innerText;
-            submitBtn.innerText = "กำลังส่งข้อมูล...";
-            submitBtn.disabled = true;
+            toggleLoading(true); // เปิด Overlay ดำ
 
             const currentMode = document.getElementById("formCurrentMode").value; 
             let type = currentMode.toUpperCase();
@@ -610,33 +601,37 @@
 
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 closeModal();
-                showToast("บันทึกคำร้องสำเร็จ! กำลังอัปเดตหน้าจอ...");
+                // รอ Google บันทึก 1.5 วิ
                 setTimeout(() => {
                     fetchSheetData(true).then(() => {
-                        submitBtn.innerText = originalText; 
-                        submitBtn.disabled = false;
+                        toggleLoading(false); // ปิด Overlay
+                        showToast("บันทึกคำร้องสำเร็จ!");
                     });
                 }, 1500);
             }).catch(err => {
+                toggleLoading(false);
                 alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
-                submitBtn.innerText = originalText; 
-                submitBtn.disabled = false;
             });
         }
 
+        // 3. อนุมัติ / ปฏิเสธ
         function approveTransaction(transId, isApprove) {
             if(!confirm(`ยืนยันการ ${isApprove ? 'อนุมัติ' : 'ปฏิเสธ'} คำร้อง ${transId} ใช่หรือไม่?`)) return;
+            toggleLoading(true);
+
             const params = new URLSearchParams({ action: isApprove ? 'approve' : 'reject', transId: transId, t: new Date().getTime() });
             
-            showToast("กำลังประมวลผลการอนุมัติ...");
             fetch(WEB_APP_URL + "?" + params.toString(), { mode: 'no-cors' }).then(() => {
                 setTimeout(() => {
-                    showToast("อัปเดตสถานะสำเร็จ!");
-                    fetchSheetData(true);
+                    fetchSheetData(true).then(() => {
+                        toggleLoading(false);
+                        showToast("อัปเดตสถานะสำเร็จ!");
+                    });
                 }, 1500);
-            }).catch(err => { alert("เกิดข้อผิดพลาด"); });
+            }).catch(err => { toggleLoading(false); alert("เกิดข้อผิดพลาด"); });
         }
 
+        // ฟังก์ชันอัปเดตการ์ด Dashboard 
         function updateDashboardCards() {
             const site = document.getElementById("siteFilter").value;
             const siteSelectEl = document.getElementById("siteFilter");
@@ -647,7 +642,7 @@
             
             inventoryData.forEach(item => {
                 let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
-                if (stock > 0 || site === "all") { // นับเฉพาะที่มีของ
+                if (stock > 0 || site === "all") { 
                     let inVal = stock * (item.unitPrice || 0) * 1.2; 
                     let stockVal = stock * (item.unitPrice || 0);
                     totalInVal += inVal;
@@ -680,8 +675,11 @@
             document.getElementById('pendingSummaryBadge').innerText = pendingCount + " รายการ";
         }
 
+        // อัปเดตกราฟให้ดึงข้อมูล 7 วันล่าสุดจริงๆ มาโชว์
         function updateCharts() {
             const site = document.getElementById("siteFilter").value;
+            
+            // 1. สร้างกราฟโดนัท (Pie Chart)
             let catData = {};
             inventoryData.forEach(item => {
                 let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
@@ -702,139 +700,34 @@
                 categoryPieChartInstance.data.datasets[0].data = values;
                 categoryPieChartInstance.update();
             }
-        }
 
-        function syncSiteFilter(selectedSite) { 
-            document.getElementById("siteFilter").value = selectedSite; 
-            renderAll(); 
-        }
-
-        function switchView(viewName) { 
-            currentActiveView = viewName; 
-            ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
-                const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
-            });
-            const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); 
-            
-            let navId = 'nav-dashboard';
-            if(viewName === 'inventory') navId = 'nav-inventory';
-            else if(viewName === 'trans-out') navId = 'nav-trans-out';
-            else if(viewName === 'trans-in') navId = 'nav-trans-in';
-            else if(viewName === 'trans-adj') navId = 'nav-trans-adj';
-            else if(viewName === 'approvals') navId = 'nav-approvals';
-            else if(viewName === 'projects') navId = 'nav-projects';
-            else if(viewName === 'rep-out') navId = 'nav-rep-out';
-            else if(viewName === 'rep-in') navId = 'nav-rep-in';
-            else if(viewName === 'rep-overview') navId = 'nav-rep-overview';
-
-            updateActiveNav(navId);
-            lucide.createIcons(); 
-        }
-
-        function updateActiveNav(navId) {
-            const allNavs = ['nav-dashboard', 'nav-inventory', 'nav-trans-out', 'nav-trans-in', 'nav-trans-adj', 'nav-approvals', 'nav-projects', 'nav-rep-out', 'nav-rep-in', 'nav-rep-overview'];
-            allNavs.forEach(id => {
-                const el = document.getElementById(id);
-                if(el) {
-                    if (id.includes('trans-') || id.includes('rep-')) {
-                        el.classList.remove('bg-slate-800', 'text-amber-400', 'text-emerald-400', 'text-blue-400', 'bg-slate-800/60');
-                        el.classList.add('text-slate-300');
-                    } else {
-                        el.classList.remove('bg-amber-500', 'text-slate-950', 'font-semibold');
-                        el.classList.add('text-slate-400');
-                    }
+            // 2. สร้างกราฟเส้น 7 วันย้อนหลัง (Trend Chart)
+            if (usageTrendChartInstance) {
+                let dates = [];
+                let usageCounts = [];
+                let today = new Date();
+                
+                // สร้าง Label 7 วันย้อนหลัง (แบบสั้นๆ เช่น 15 ส.ค.)
+                for (let i = 6; i >= 0; i--) {
+                    let d = new Date(today);
+                    d.setDate(d.getDate() - i);
+                    let dateStr = d.toISOString().split('T')[0]; // yyyy-mm-dd สำหรับเทียบข้อมูล
+                    dates.push(`${d.getDate()}/${d.getMonth()+1}`);
+                    
+                    // นับจำนวนบิลเบิกของวันที่นั้นๆ
+                    let count = 0;
+                    transactionsDatabase.forEach(t => {
+                        if (t.date === dateStr && t.mode === 'out' && t.status === 'อนุมัติ') {
+                            if (site === "all" || t.site === site) count++;
+                        }
+                    });
+                    usageCounts.push(count);
                 }
-            });
-
-            const activeEl = document.getElementById(navId);
-            if(activeEl) {
-                if (navId.includes('trans-') || navId.includes('rep-')) {
-                    activeEl.classList.add('bg-slate-800/60');
-                    if(navId.includes('out')) activeEl.classList.add('text-amber-400');
-                    if(navId.includes('in')) activeEl.classList.add('text-emerald-400');
-                    if(navId.includes('adj') || navId.includes('overview')) activeEl.classList.add('text-blue-400');
-                } else {
-                    activeEl.classList.remove('text-slate-400');
-                    activeEl.classList.add('bg-amber-500', 'text-slate-950', 'font-semibold');
-                }
+                
+                usageTrendChartInstance.data.labels = dates;
+                usageTrendChartInstance.data.datasets[0].data = usageCounts;
+                usageTrendChartInstance.update();
             }
-        }
-
-        function renderAll() { 
-            updateDashboardCards();
-            updateCharts();
-            renderInventoryTable(); 
-            renderLowStockAlertTable(); 
-            renderProjectCardsGrid(); 
-            renderSubmenuHistoryTables(); 
-            renderApprovalTable(); 
-        }
-
-        function renderInventoryTable() {
-            const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
-            const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
-            const site = document.getElementById("siteFilter").value;
-            
-            // กรองทั้งจากช่องค้นหา และจาก Site Filter (ซ่อนของที่ไม่มีสต็อก)
-            let data = inventoryData.filter(i => {
-                let stock = site === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[site] || 0);
-                let matchSearch = term === "" || i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term);
-                let matchSite = site === "all" || stock > 0; // แสดงเฉพาะที่มีของ
-                return matchSearch && matchSite;
-            });
-            
-            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 font-bold">ไม่พบรายการวัสดุในโครงการนี้</td></tr>`; return; }
-            
-            let html = `
-                <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b">
-                    <tr>
-                        <th class="py-3 px-4">รหัสวัสดุ</th>
-                        <th class="py-3 px-4">รายการวัสดุ</th>
-                        <th class="py-3 px-4">หมวดหมู่</th>
-                        <th class="py-3 px-4 text-right">คงเหลือรวม</th>
-                        <th class="py-3 px-4 text-right">จุด Safety</th>
-                        <th class="py-3 px-4">หน่วย</th>
-                        <th class="py-3 px-4 text-center">สถานะ</th>
-                        <th class="py-3 px-4 text-center">การจัดการ</th>
-                    </tr>
-                </thead>
-            `;
-
-            // เรียงลำดับจากสต็อกมากไปน้อยก่อนโชว์
-            data.sort((a,b) => {
-                let sA = site === "all" ? a.siteStocks["all"] : (a.siteStocks[site] || 0);
-                let sB = site === "all" ? b.siteStocks["all"] : (b.siteStocks[site] || 0);
-                return sB - sA;
-            }).slice(0, 200).forEach(item => { 
-                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
-                let isLow = stock <= item.min;
-                let statusSpan = isLow ? `<span class="bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded text-[11px]">สต็อกต่ำ</span>` : `<span class="text-emerald-600 font-bold text-[11px]">● ปกติ</span>`;
-                html += `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-[11px]"><span class="bg-slate-100 px-2 py-1 rounded-md border">${item.category}</span></td><td class="py-3 px-4 text-right font-bold ${isLow ? 'text-rose-600' : 'text-slate-900'}">${stock.toLocaleString()}</td><td class="py-3 px-4 text-right text-slate-400 text-[11px]">${item.min}</td><td class="py-3 px-4 text-[11px] text-slate-500">${item.unit}</td><td class="py-3 px-4 text-center">${statusSpan}</td><td class="py-3 px-4 text-center"><button onclick="openTransactionModal('adj')" class="text-[11px] bg-slate-100 border hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold transition">ปรับสต็อก</button></td></tr>`;
-            });
-            tbody.innerHTML = html;
-        }
-
-        function renderLowStockAlertTable() {
-            const tbody = document.getElementById("lowStockAlertTableBody"); if (!tbody) return;
-            const site = document.getElementById("siteFilter").value;
-            
-            let lowStockItems = inventoryData.filter(i => {
-                let stock = site === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[site] || 0);
-                // กรองให้แจ้งเตือนเฉพาะของที่มีสต็อกมากกว่า 0 แต่ต่ำกว่าจุด Safety หรือเป็นภาพรวมบริษัท
-                if (site === "all") return stock <= i.min;
-                return stock > 0 && stock <= i.min; 
-            });
-            
-            document.getElementById("card-low-stock").innerText = `${lowStockItems.length} รายการ`;
-            const badge = document.getElementById("lowStockTableBadge"); if (badge) badge.innerText = `${lowStockItems.length} รายการ`;
-            
-            if (lowStockItems.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-emerald-600 font-bold">✅ สต็อกเพียงพอทุกรายการ</td></tr>`; return; }
-            let html = '';
-            lowStockItems.slice(0, 100).forEach(item => {
-                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
-                html += `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-right font-bold text-rose-600">${stock.toLocaleString()}</td><td class="py-3 px-4 text-right text-xs text-slate-400">${item.min}</td><td class="py-3 px-4 text-center"><span class="bg-rose-100 text-rose-700 text-[11px] px-2 py-0.5 rounded font-bold">สต็อกต่ำ</span></td></tr>`;
-            });
-            tbody.innerHTML = html;
         }
 
         function onDataLoaded(rawSheetData) {
@@ -887,25 +780,130 @@
             openProjectDrilldown(currentDrilldownSite);
         }
 
-        // ฟังก์ชันสร้าง Dropdown โดยดึงเลขสต็อกตามไซต์ที่เลือก
+        // =====================================
+        // ฟังก์ชัน UI ย่อย (ตารางต่างๆ)
+        // =====================================
         function populateModalMaterials(site = "all") { 
             const select = document.getElementById("modalItemSelect"); if (!select) return;
-            
-            // จำค่าที่เลือกไว้ก่อนหน้า
             const currentValue = select.value;
-            
             let optionsHTML = '<option value="" disabled selected>-- พิมพ์ค้นหาวัสดุ --</option>';
             inventoryData.forEach(item => { 
                 let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
                 optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${stock.toLocaleString()} ${item.unit})</option>`; 
             });
             select.innerHTML = optionsHTML; 
-            
             if(currentValue) select.value = currentValue;
         }
 
+        function syncSiteFilter(selectedSite) { document.getElementById("siteFilter").value = selectedSite; renderAll(); }
         function toggleTransactionSubmenu() { document.getElementById("transSubmenu").classList.toggle("hidden"); }
         function toggleReportSubmenu() { document.getElementById("reportSubmenu").classList.toggle("hidden"); }
+
+        function renderAll() { 
+            updateDashboardCards();
+            updateCharts();
+            renderInventoryTable(); 
+            renderLowStockAlertTable(); 
+            renderProjectCardsGrid(); 
+            renderSubmenuHistoryTables(); 
+            renderApprovalTable(); 
+        }
+
+        function switchView(viewName) { 
+            currentActiveView = viewName; 
+            ['dashboard', 'inventory', 'approvals', 'projects', 'trans-out', 'trans-in', 'trans-adj', 'rep-out', 'rep-in', 'rep-overview'].forEach(v => {
+                const el = document.getElementById(`view-${v}`); if (el) el.classList.add('hidden');
+            });
+            const current = document.getElementById(`view-${viewName}`); if (current) current.classList.remove('hidden'); 
+            
+            let navId = 'nav-dashboard';
+            if(viewName === 'inventory') navId = 'nav-inventory';
+            else if(viewName === 'trans-out') navId = 'nav-trans-out';
+            else if(viewName === 'trans-in') navId = 'nav-trans-in';
+            else if(viewName === 'trans-adj') navId = 'nav-trans-adj';
+            else if(viewName === 'approvals') navId = 'nav-approvals';
+            else if(viewName === 'projects') navId = 'nav-projects';
+            
+            updateActiveNav(navId);
+            lucide.createIcons(); 
+        }
+
+        function updateActiveNav(navId) {
+            const allNavs = ['nav-dashboard', 'nav-inventory', 'nav-trans-out', 'nav-trans-in', 'nav-trans-adj', 'nav-approvals', 'nav-projects', 'nav-rep-out', 'nav-rep-in', 'nav-rep-overview'];
+            allNavs.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    el.classList.remove('bg-slate-800', 'text-amber-400', 'text-emerald-400', 'text-blue-400', 'bg-slate-800/60', 'bg-amber-500', 'text-slate-950', 'font-semibold');
+                    if (id.includes('trans-') || id.includes('rep-')) el.classList.add('text-slate-300');
+                    else el.classList.add('text-slate-400');
+                }
+            });
+
+            const activeEl = document.getElementById(navId);
+            if(activeEl) {
+                if (navId.includes('trans-') || navId.includes('rep-')) {
+                    activeEl.classList.add('bg-slate-800/60');
+                    if(navId.includes('out')) activeEl.classList.add('text-amber-400');
+                    if(navId.includes('in')) activeEl.classList.add('text-emerald-400');
+                    if(navId.includes('adj') || navId.includes('overview')) activeEl.classList.add('text-blue-400');
+                } else {
+                    activeEl.classList.remove('text-slate-400');
+                    activeEl.classList.add('bg-amber-500', 'text-slate-950', 'font-semibold');
+                }
+            }
+        }
+
+        function renderInventoryTable() {
+            const tbody = document.getElementById("inventoryTableBody"); if (!tbody) return;
+            const term = (document.getElementById("searchInput")?.value || "").toLowerCase();
+            const site = document.getElementById("siteFilter").value;
+            
+            let data = inventoryData.filter(i => {
+                let stock = site === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[site] || 0);
+                let matchSearch = term === "" || i.name.toLowerCase().includes(term) || i.id.toLowerCase().includes(term);
+                let matchSite = site === "all" || stock > 0; 
+                return matchSearch && matchSite;
+            });
+            
+            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 font-bold">ไม่พบรายการวัสดุในโครงการนี้</td></tr>`; return; }
+            
+            let html = `
+                <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b">
+                    <tr><th class="py-3 px-4">รหัสวัสดุ</th><th class="py-3 px-4">รายการวัสดุ</th><th class="py-3 px-4">หมวดหมู่</th><th class="py-3 px-4 text-right">คงเหลือรวม</th><th class="py-3 px-4 text-right">จุด Safety</th><th class="py-3 px-4">หน่วย</th><th class="py-3 px-4 text-center">สถานะ</th><th class="py-3 px-4 text-center">การจัดการ</th></tr>
+                </thead>
+            `;
+
+            data.sort((a,b) => {
+                let sA = site === "all" ? a.siteStocks["all"] : (a.siteStocks[site] || 0);
+                let sB = site === "all" ? b.siteStocks["all"] : (b.siteStocks[site] || 0);
+                return sB - sA;
+            }).slice(0, 200).forEach(item => { 
+                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
+                let isLow = stock <= item.min;
+                let statusSpan = isLow ? `<span class="bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded text-[11px]">สต็อกต่ำ</span>` : `<span class="text-emerald-600 font-bold text-[11px]">● ปกติ</span>`;
+                html += `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-[11px]"><span class="bg-slate-100 px-2 py-1 rounded-md border">${item.category}</span></td><td class="py-3 px-4 text-right font-bold ${isLow ? 'text-rose-600' : 'text-slate-900'}">${stock.toLocaleString()}</td><td class="py-3 px-4 text-right text-slate-400 text-[11px]">${item.min}</td><td class="py-3 px-4 text-[11px] text-slate-500">${item.unit}</td><td class="py-3 px-4 text-center">${statusSpan}</td><td class="py-3 px-4 text-center"><button onclick="openTransactionModal('adj')" class="text-[11px] bg-slate-100 border hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold transition">ปรับสต็อก</button></td></tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function renderLowStockAlertTable() {
+            const tbody = document.getElementById("lowStockAlertTableBody"); if (!tbody) return;
+            const site = document.getElementById("siteFilter").value;
+            
+            let lowStockItems = inventoryData.filter(i => {
+                let stock = site === "all" ? (i.siteStocks["all"] || 0) : (i.siteStocks[site] || 0);
+                if (site === "all") return stock <= i.min;
+                return stock > 0 && stock <= i.min; 
+            });
+            
+            if (lowStockItems.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-emerald-600 font-bold">✅ สต็อกเพียงพอทุกรายการ</td></tr>`; return; }
+            let html = '';
+            lowStockItems.slice(0, 100).forEach(item => {
+                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
+                html += `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 font-mono text-xs">${item.id}</td><td class="py-3 px-4 font-bold text-slate-800">${item.name}</td><td class="py-3 px-4 text-right font-bold text-rose-600">${stock.toLocaleString()}</td><td class="py-3 px-4 text-right text-xs text-slate-400">${item.min}</td><td class="py-3 px-4 text-center"><span class="bg-rose-100 text-rose-700 text-[11px] px-2 py-0.5 rounded font-bold">สต็อกต่ำ</span></td></tr>`;
+            });
+            tbody.innerHTML = html;
+        }
 
         function renderProjectCardsGrid() {
             const container = document.getElementById("projectCardsContainer"); if (!container) return; container.innerHTML = "";
@@ -925,7 +923,6 @@
             renderProjectCardsGrid(); renderDrilldownTable();
         }
 
-        // ตารางแยกรายชิ้นในเมนู "มูลค่าโครงการ" (ซ่อนของไม่มีสต็อก)
         function renderDrilldownTable() {
             const tbody = document.getElementById("projectDrilldownTableBody"); if (!tbody) return;
             let html = '';
@@ -960,10 +957,8 @@
             
             transactionsDatabase.forEach(item => {
                 if (site !== "all" && item.site !== site) return;
-
                 let b = item.status === 'รออนุมัติ' ? `<span class="bg-amber-100 text-amber-800 text-[11px] px-2 rounded font-bold">⏳ รออนุมัติ</span>` : (item.status === 'อนุมัติ' ? `<span class="bg-emerald-100 text-emerald-800 text-[11px] px-2 rounded font-bold">✓ อนุมัติ</span>` : `<span class="bg-rose-100 text-rose-800 text-[11px] px-2 rounded font-bold">✗ ปฏิเสธ</span>`);
                 const row = `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="py-3 px-4 text-xs text-slate-500">${item.date}</td><td class="py-3 px-4 font-mono font-bold text-[11px] text-slate-400">${item.id}</td><td class="py-3 px-4 font-medium text-slate-700 text-xs">${item.site}</td><td class="py-3 px-4 font-bold text-slate-900 text-xs">${item.itemName}</td><td class="py-3 px-4 text-right font-bold text-slate-600">${item.qty} <span class="text-[10px] font-normal text-slate-400">${item.unit}</span></td><td class="py-3 px-4 text-xs text-slate-500">${item.requester}</td><td class="py-3 px-4 text-center">${b}</td></tr>`;
-                
                 if (item.mode === 'out') htmlOut += row;
                 if (item.mode === 'in') htmlIn += row;
                 if (item.mode === 'adj') htmlAdj += row;
@@ -1023,12 +1018,14 @@
             document.getElementById("transModal").classList.add("flex"); 
             
             setTimeout(() => {
-                // เซ็ต Dropdown ให้เลขคงเหลือตรงกับไซต์ที่เลือกอยู่ใน Modal ปัจจุบัน
                 const siteSelect = document.getElementById("modalSiteSelect");
-                populateModalMaterials(siteSelect.value);
+                populateModalMaterials(siteSelect.value); // ตัดคำยาว
                 
                 const itemSelect = document.getElementById("modalItemSelect");
-                if (itemSelect.options.length > 0) itemSelect.dispatchEvent(new Event('change'));
+                if (itemSelect.options.length > 0) {
+                    itemSelect.selectedIndex = 0; // รีเซ็ตให้เลือกอันแรกเสมอ
+                    updateLiveStockBadge(); // บังคับให้ป้ายเหลืองแสดงค่าจริงทันที
+                }
             }, 100);
         }
         
@@ -1037,19 +1034,11 @@
 
         function initCharts() {
             const ctx1 = document.getElementById('usageTrendChart')?.getContext('2d');
-            if (ctx1) usageTrendChartInstance = new Chart(ctx1, { type: 'line', data: { labels: ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'], datasets: [{ label: 'ข้อมูลการเบิกใช้', data: [0,0,0,0,0,0,0], borderColor: '#f59e0b' }] } });
+            if (ctx1) usageTrendChartInstance = new Chart(ctx1, { type: 'line', data: { labels: ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'], datasets: [{ label: 'จำนวนบิลเบิกจ่าย (ครั้ง)', data: [0,0,0,0,0,0,0], borderColor: '#f59e0b', tension: 0.3 }] } });
             const ctx2 = document.getElementById('categoryPieChart')?.getContext('2d');
             if (ctx2) categoryPieChartInstance = new Chart(ctx2, { type: 'doughnut', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ data: [1], backgroundColor: ['#cbd5e1'] }] } });
         }
-
-        function initReportCharts() {
-            const c1 = document.getElementById('disbursementMonthlyChart')?.getContext('2d');
-            if (c1) disbursementMonthlyChartInstance = new Chart(c1, { type: 'bar', data: { labels: ['ม.ค.', 'ก.พ.', 'มี.ค.'], datasets: [{ label: 'เบิกจ่าย', data: [0,0,0], backgroundColor: '#f59e0b' }] } });
-            const c2 = document.getElementById('receivingMonthlyChart')?.getContext('2d');
-            if (c2) receivingMonthlyChartInstance = new Chart(c2, { type: 'bar', data: { labels: ['ม.ค.', 'ก.พ.', 'มี.ค.'], datasets: [{ label: 'รับเข้า', data: [0,0,0], backgroundColor: '#10b981' }] } });
-            const c3 = document.getElementById('companyOverviewChart')?.getContext('2d');
-            if (c3) companyOverviewChartInstance = new Chart(c3, { type: 'bar', data: { labels: ['สโตร์กลาง', 'ทวีวงษ์'], datasets: [{ label: 'มูลค่า', data: [0,0], backgroundColor: '#3b82f6' }] } });
-        }
+        function initReportCharts() {}
     </script>
 </body>
 </html>
