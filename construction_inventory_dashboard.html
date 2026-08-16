@@ -479,6 +479,9 @@
         // ตัวแปรเก็บ Instance ของ Chart
         let usageTrendChartInstance = null;
         let categoryPieChartInstance = null;
+        let disbursementMonthlyChartInstance = null;
+        let receivingMonthlyChartInstance = null;
+        let companyOverviewChartInstance = null;
 
         function toggleLoading(show) {
             const overlay = document.getElementById("loadingOverlay");
@@ -558,6 +561,12 @@
                                 price: Number(row.Unit_Price) || 0, 
                                 stocks: {} 
                             };
+                        }
+                        // วัสดุ 1 รายการอาจถูกบันทึกหลายแถว (แยกตามโครงการ) และบางแถวอาจยังไม่ได้กรอกราคา
+                        // ถ้าราคาที่เก็บไว้ตอนนี้เป็น 0 แต่แถวนี้มีราคา ให้ใช้ราคาจากแถวนี้แทน
+                        let rowPrice = Number(row.Unit_Price) || 0;
+                        if (!rawSheetData[code].price && rowPrice) {
+                            rawSheetData[code].price = rowPrice;
                         }
                         rawSheetData[code].stocks[row.Location_Project] = Number(row.Current_Qty) || 0;
                     });
@@ -699,6 +708,7 @@
             // ป้องกันให้ฟังก์ชัน Render พังตัวเดียว ไม่พาทั้งระบบล่ม
             try { updateDashboardCards(); } catch(e){ console.error(e); }
             try { updateCharts(); } catch(e){ console.error(e); }
+            try { updateReportCharts(); } catch(e){ console.error(e); }
             try { renderInventoryTable(); } catch(e){ console.error(e); }
             try { renderLowStockAlertTable(); } catch(e){ console.error(e); }
             try { renderProjectCardsGrid(); } catch(e){ console.error(e); }
@@ -759,6 +769,18 @@
             
             const ctx2 = document.getElementById('categoryPieChart');
             if (ctx2) categoryPieChartInstance = new Chart(ctx2.getContext('2d'), { type: 'doughnut', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ data: [1], backgroundColor: ['#cbd5e1'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+            const ctx3 = document.getElementById('disbursementMonthlyChart');
+            if (ctx3) disbursementMonthlyChartInstance = new Chart(ctx3.getContext('2d'), { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'มูลค่าเบิกจ่าย (฿)', data: [0], backgroundColor: '#f59e0b' }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+            const ctx4 = document.getElementById('receivingMonthlyChart');
+            if (ctx4) receivingMonthlyChartInstance = new Chart(ctx4.getContext('2d'), { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'มูลค่ารับเข้า (฿)', data: [0], backgroundColor: '#10b981' }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+            const ctx5 = document.getElementById('companyOverviewChart');
+            if (ctx5) companyOverviewChartInstance = new Chart(ctx5.getContext('2d'), { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [
+                { label: 'มูลค่ารับเข้า (฿)', data: [0], backgroundColor: '#0f172a' },
+                { label: 'มูลค่าคงเหลือ (฿)', data: [0], backgroundColor: '#f59e0b' }
+            ] }, options: { responsive: true, maintainAspectRatio: false } });
         }
 
         function updateCharts() {
@@ -817,6 +839,62 @@
             }
         }
 
+        // อัปเดตกราฟหน้า "สรุปรายงาน" (รายเดือน) — เบิกจ่าย / รับเข้า / ภาพรวมบริษัท
+        function updateReportCharts() {
+            if (typeof Chart === 'undefined') return;
+            const site = document.getElementById("siteFilter").value;
+
+            // เตรียม label 6 เดือนล่าสุด (YYYY-MM) เรียงเก่า -> ใหม่
+            let months = [];
+            let today = new Date();
+            for (let i = 5; i >= 0; i--) {
+                let d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                let key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                months.push(key);
+            }
+            let monthLabels = months.map(m => {
+                let [y, mo] = m.split('-');
+                return `${mo}/${y.slice(2)}`;
+            });
+
+            let outValByMonth = {}, inValByMonth = {};
+            months.forEach(m => { outValByMonth[m] = 0; inValByMonth[m] = 0; });
+
+            transactionsDatabase.forEach(t => {
+                if (site !== "all" && t.site !== site) return;
+                if (t.status !== 'อนุมัติ') return;
+                let monthKey = String(t.date || "").slice(0, 7);
+                if (!months.includes(monthKey)) return;
+
+                let matchItem = inventoryData.find(i => i.id === t.itemId);
+                let price = matchItem ? (matchItem.unitPrice || 0) : 0;
+                let val = (Number(t.qty) || 0) * price;
+
+                if (t.mode === 'out') outValByMonth[monthKey] += val;
+                else if (t.mode === 'in') inValByMonth[monthKey] += val * 1.2;
+            });
+
+            let outValues = months.map(m => Math.round(outValByMonth[m]));
+            let inValues = months.map(m => Math.round(inValByMonth[m]));
+
+            if (disbursementMonthlyChartInstance) {
+                disbursementMonthlyChartInstance.data.labels = monthLabels;
+                disbursementMonthlyChartInstance.data.datasets[0].data = outValues;
+                disbursementMonthlyChartInstance.update();
+            }
+            if (receivingMonthlyChartInstance) {
+                receivingMonthlyChartInstance.data.labels = monthLabels;
+                receivingMonthlyChartInstance.data.datasets[0].data = inValues;
+                receivingMonthlyChartInstance.update();
+            }
+            if (companyOverviewChartInstance) {
+                companyOverviewChartInstance.data.labels = monthLabels;
+                companyOverviewChartInstance.data.datasets[0].data = inValues;
+                companyOverviewChartInstance.data.datasets[1].data = outValues;
+                companyOverviewChartInstance.update();
+            }
+        }
+
         // =====================================
         // ฟังก์ชัน UI ย่อย (ตารางต่างๆ)
         // =====================================
@@ -840,6 +918,7 @@
         function renderAll() { 
             try { updateDashboardCards(); } catch(e){}
             try { updateCharts(); } catch(e){}
+            try { updateReportCharts(); } catch(e){}
             try { renderInventoryTable(); } catch(e){}
             try { renderLowStockAlertTable(); } catch(e){}
             try { renderProjectCardsGrid(); } catch(e){}
@@ -861,6 +940,9 @@
             else if(viewName === 'trans-adj') navId = 'nav-trans-adj';
             else if(viewName === 'approvals') navId = 'nav-approvals';
             else if(viewName === 'projects') navId = 'nav-projects';
+            else if(viewName === 'rep-out') navId = 'nav-rep-out';
+            else if(viewName === 'rep-in') navId = 'nav-rep-in';
+            else if(viewName === 'rep-overview') navId = 'nav-rep-overview';
             
             updateActiveNav(navId);
             if(typeof lucide !== 'undefined') lucide.createIcons(); 
