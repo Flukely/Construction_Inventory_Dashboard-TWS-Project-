@@ -8,8 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- เปลี่ยน CDN ของ Chart.js ให้สเถียรขึ้น -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
     <!-- Google Fonts: Prompt -->
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -20,7 +22,6 @@
         .project-card-active { border-color: #f59e0b !important; background-color: #fffbeb !important; box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.15); }
         
         .select-truncate { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
         #loadingOverlay { transition: opacity 0.3s ease; }
     </style>
 </head>
@@ -256,7 +257,7 @@
             </div>
         </div>
 
-        <!-- VIEW: มูลค่าวัสดุ/โครงการ (พร้อมการ์ดครบทุกโครงการ) -->
+        <!-- VIEW: มูลค่าวัสดุ/โครงการ -->
         <div id="view-projects" class="p-6 space-y-6 hidden">
             <div>
                 <div class="flex items-center justify-between mb-3">
@@ -426,6 +427,7 @@
                         <label class="block text-xs font-semibold text-slate-700">เลือกรายการวัสดุ *</label>
                         <span id="liveStockBadge" class="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">คงเหลือ: 0</span>
                     </div>
+                    <!-- เพิ่มคลาส select-truncate ป้องกันชื่อล้นจอ -->
                     <select id="modalItemSelect" required class="w-full border p-2.5 text-sm rounded-xl font-medium select-truncate"></select>
                 </div>
 
@@ -496,8 +498,23 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
-            initCharts();
-            initReportCharts();
+            
+            // ป้องกัน Error จาก Chart.js โหลดไม่ทัน
+            if (typeof Chart !== 'undefined') {
+                initCharts();
+                initReportCharts();
+            } else {
+                console.warn("Chart.js is not loaded yet.");
+                // ลองสร้างอีกครั้งหลังจากผ่านไป 1 วินาที
+                setTimeout(() => {
+                    if (typeof Chart !== 'undefined') {
+                        initCharts();
+                        initReportCharts();
+                        updateCharts();
+                    }
+                }, 1000);
+            }
+            
             fetchSheetData();
             updateActiveNav('nav-dashboard'); 
             
@@ -649,92 +666,81 @@
             } catch(e) { console.log('Cards update error:', e); }
         }
 
-        // อัปเดตกราฟให้ดึงข้อมูลจริงมาโชว์
-        function updateCharts() {
-            try {
-                const site = document.getElementById("siteFilter").value;
-                
-                let catData = {};
-                inventoryData.forEach(item => {
-                    let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
-                    let val = stock * (item.unitPrice || 0);
-                    if (val > 0) catData[item.category] = (catData[item.category] || 0) + val;
+        function onDataLoaded(rawSheetData) {
+            inventoryData = [];
+            let totalCompanyInVal = 0, totalCompanyStockVal = 0;
+            let siteTotals = {
+                "สโตร์กลาง": { stockVal: 0, inVal: 0 }, "ทวีวงษ์ New factory": { stockVal: 0, inVal: 0 },
+                "บุญพา": { stockVal: 0, inVal: 0 }, "บ้านคุณบี": { stockVal: 0, inVal: 0 },
+                "บ้านคุณอรรถา": { stockVal: 0, inVal: 0 }, "KVG อาคารเก็บสินค้า": { stockVal: 0, inVal: 0 }, "ศิริชัย": { stockVal: 0, inVal: 0 }
+            };
+
+            for (let code in rawSheetData) {
+                let item = rawSheetData[code];
+                let unitPrice = item.price || 0; 
+                let siteStocks = { "all": 0 };
+                let itemTotalStock = 0;
+
+                for (let site in item.stocks) {
+                    let qty = item.stocks[site];
+                    siteStocks[site] = qty;
+                    itemTotalStock += qty;
+                    if (siteTotals[site]) {
+                        siteTotals[site].stockVal += (qty * unitPrice);
+                        siteTotals[site].inVal += (qty * unitPrice * 1.2);
+                    }
+                }
+                siteStocks["all"] = itemTotalStock;
+                totalCompanyStockVal += (itemTotalStock * unitPrice);
+                totalCompanyInVal += (itemTotalStock * unitPrice * 1.2);
+
+                inventoryData.push({
+                    id: item.code, name: item.name || "ไม่มีชื่อ", category: item.cat || "ไม่ระบุ",
+                    min: item.safe, unit: item.unit || "หน่วย", unitPrice: unitPrice, location: "คลังหลัก", siteStocks: siteStocks
                 });
-                
-                if (categoryPieChartInstance) {
-                    let labels = Object.keys(catData);
-                    let values = Object.values(catData);
-                    if (labels.length === 0) { 
-                        labels = ['ไม่มีข้อมูล']; values = [1]; 
-                        categoryPieChartInstance.data.datasets[0].backgroundColor = ['#e2e8f0']; 
-                    } else { 
-                        categoryPieChartInstance.data.datasets[0].backgroundColor = ['#0f172a', '#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6']; 
-                    }
-                    categoryPieChartInstance.data.labels = labels;
-                    categoryPieChartInstance.data.datasets[0].data = values;
-                    categoryPieChartInstance.update();
-                }
+            }
 
-                // กราฟ 7 วันล่าสุด
-                if (usageTrendChartInstance) {
-                    let dates = [];
-                    let usageCounts = [];
-                    let today = new Date();
-                    
-                    for (let i = 6; i >= 0; i--) {
-                        let d = new Date(today);
-                        d.setDate(d.getDate() - i);
-                        let dateStr = d.toISOString().split('T')[0];
-                        dates.push(`${d.getDate()}/${d.getMonth()+1}`);
-                        
-                        let count = 0;
-                        transactionsDatabase.forEach(t => {
-                            if (t.date === dateStr && t.mode === 'out' && t.status === 'อนุมัติ') {
-                                if (site === "all" || t.site === site) count += parseFloat(t.qty);
-                            }
-                        });
-                        usageCounts.push(count);
-                    }
-                    usageTrendChartInstance.data.labels = dates;
-                    usageTrendChartInstance.data.datasets[0].data = usageCounts;
-                    usageTrendChartInstance.data.datasets[0].label = 'จำนวนเบิกใช้ (ชิ้น)';
-                    usageTrendChartInstance.update();
-                }
+            materialProjectData = {
+                "all": { name: "รวมภาพรวมบริษัท", icon: "🌐", inVal: "฿" + totalCompanyInVal.toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + totalCompanyStockVal.toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿" + (totalCompanyInVal - totalCompanyStockVal).toLocaleString(undefined, {minimumFractionDigits: 0}) },
+                "ทวีวงษ์ New factory": { name: "ทวีวงษ์ New factory", icon: "🏗️", inVal: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
+                "สโตร์กลาง": { name: "สโตร์กลาง", icon: "🏢", inVal: "฿" + (siteTotals["สโตร์กลาง"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["สโตร์กลาง"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
+                "บุญพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุญพา"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["บุญพา"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
+                "บ้านคุณบี": { name: "บ้านคุณบี", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณบี"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["บ้านคุณบี"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
+                "บ้านคุณอรรถา": { name: "บ้านคุณอรรถา", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณอรรถา"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["บ้านคุณอรรถา"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
+                "ศิริชัย": { name: "ศิริชัย", icon: "🏗️", inVal: "฿" + (siteTotals["ศิริชัย"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["ศิริชัย"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
+                "KVG อาคารเก็บสินค้า": { name: "KVG อาคารเก็บสินค้า", icon: "🏬", inVal: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" }
+            };
 
-                // อัปเดตกราฟหน้ารายงาน (เมนูสรุปรายงาน)
-                if (disbursementMonthlyChartInstance && transactionsDatabase.length > 0) {
-                    // จัดกลุ่มเบิกจ่ายตามหมวดหมู่
-                    let outData = {};
-                    transactionsDatabase.forEach(t => {
-                        if (t.mode === 'out' && t.status === 'อนุมัติ' && (site === 'all' || t.site === site)) {
-                            let item = inventoryData.find(i => i.id === t.itemId);
-                            let cat = item ? item.category : 'ทั่วไป';
-                            outData[cat] = (outData[cat] || 0) + parseFloat(t.qty);
-                        }
-                    });
-                    disbursementMonthlyChartInstance.data.labels = Object.keys(outData).length ? Object.keys(outData) : ['ไม่มีข้อมูล'];
-                    disbursementMonthlyChartInstance.data.datasets[0].data = Object.keys(outData).length ? Object.values(outData) : [0];
-                    disbursementMonthlyChartInstance.update();
-                }
+            populateModalMaterials(); 
+            renderAll(); 
+            openProjectDrilldown(currentDrilldownSite);
+        }
 
-                if (receivingMonthlyChartInstance && transactionsDatabase.length > 0) {
-                    let inData = {};
-                    transactionsDatabase.forEach(t => {
-                        if (t.mode === 'in' && t.status === 'อนุมัติ' && (site === 'all' || t.site === site)) {
-                            let item = inventoryData.find(i => i.id === t.itemId);
-                            let cat = item ? item.category : 'ทั่วไป';
-                            inData[cat] = (inData[cat] || 0) + parseFloat(t.qty);
-                        }
-                    });
-                    receivingMonthlyChartInstance.data.labels = Object.keys(inData).length ? Object.keys(inData) : ['ไม่มีข้อมูล'];
-                    receivingMonthlyChartInstance.data.datasets[0].data = Object.keys(inData).length ? Object.values(inData) : [0];
-                    receivingMonthlyChartInstance.update();
-                }
-                
-            } catch(e) { console.log('Chart update error:', e); }
+        function populateModalMaterials(site = "all") { 
+            const select = document.getElementById("modalItemSelect"); if (!select) return;
+            const currentValue = select.value;
+            let optionsHTML = '<option value="" disabled selected>-- พิมพ์ค้นหาวัสดุ --</option>';
+            inventoryData.forEach(item => { 
+                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
+                optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${stock.toLocaleString()} ${item.unit})</option>`; 
+            });
+            select.innerHTML = optionsHTML; 
+            if(currentValue) select.value = currentValue;
         }
 
         function syncSiteFilter(selectedSite) { document.getElementById("siteFilter").value = selectedSite; renderAll(); }
+        function toggleTransactionSubmenu() { document.getElementById("transSubmenu").classList.toggle("hidden"); }
+        function toggleReportSubmenu() { document.getElementById("reportSubmenu").classList.toggle("hidden"); }
+
+        function renderAll() { 
+            updateDashboardCards();
+            updateCharts();
+            renderInventoryTable(); 
+            renderLowStockAlertTable(); 
+            renderProjectCardsGrid(); 
+            renderSubmenuHistoryTables(); 
+            renderApprovalTable(); 
+        }
 
         function switchView(viewName) { 
             currentActiveView = viewName; 
@@ -781,16 +787,6 @@
                     activeEl.classList.add('bg-amber-500', 'text-slate-950', 'font-semibold');
                 }
             }
-        }
-
-        function renderAll() { 
-            updateDashboardCards();
-            updateCharts();
-            renderInventoryTable(); 
-            renderLowStockAlertTable(); 
-            renderProjectCardsGrid(); 
-            renderSubmenuHistoryTables(); 
-            renderApprovalTable(); 
         }
 
         function renderInventoryTable() {
@@ -844,71 +840,6 @@
             });
             tbody.innerHTML = html;
         }
-
-        function onDataLoaded(rawSheetData) {
-            inventoryData = [];
-            let totalCompanyInVal = 0, totalCompanyStockVal = 0;
-            let siteTotals = {
-                "สโตร์กลาง": { stockVal: 0, inVal: 0 }, "ทวีวงษ์ New factory": { stockVal: 0, inVal: 0 },
-                "บุพา": { stockVal: 0, inVal: 0 }, "บ้านคุณบี": { stockVal: 0, inVal: 0 },
-                "บ้านคุณอรรถา": { stockVal: 0, inVal: 0 }, "KVG อาคารเก็บสินค้า": { stockVal: 0, inVal: 0 }, "ศิริชัย": { stockVal: 0, inVal: 0 }
-            };
-
-            for (let code in rawSheetData) {
-                let item = rawSheetData[code];
-                let unitPrice = item.price || 0; 
-                let siteStocks = { "all": 0 };
-                let itemTotalStock = 0;
-
-                for (let site in item.stocks) {
-                    let qty = item.stocks[site];
-                    siteStocks[site] = qty;
-                    itemTotalStock += qty;
-                    if (siteTotals[site]) {
-                        siteTotals[site].stockVal += (qty * unitPrice);
-                        siteTotals[site].inVal += (qty * unitPrice * 1.2);
-                    }
-                }
-                siteStocks["all"] = itemTotalStock;
-                totalCompanyStockVal += (itemTotalStock * unitPrice);
-                totalCompanyInVal += (itemTotalStock * unitPrice * 1.2);
-
-                inventoryData.push({
-                    id: item.code, name: item.name || "ไม่มีชื่อ", category: item.cat || "ไม่ระบุ",
-                    min: item.safe, unit: item.unit || "หน่วย", unitPrice: unitPrice, location: "คลังหลัก", siteStocks: siteStocks
-                });
-            }
-
-            materialProjectData = {
-                "all": { name: "รวมภาพรวมบริษัท", icon: "🌐", inVal: "฿" + totalCompanyInVal.toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + totalCompanyStockVal.toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿" + (totalCompanyInVal - totalCompanyStockVal).toLocaleString(undefined, {minimumFractionDigits: 0}) },
-                "ทวีวงษ์ New factory": { name: "ทวีวงษ์ New factory", icon: "🏗️", inVal: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["ทวีวงษ์ New factory"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
-                "สโตร์กลาง": { name: "สโตร์กลาง", icon: "🏢", inVal: "฿" + (siteTotals["สโตร์กลาง"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["สโตร์กลาง"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
-                "บุญพา": { name: "บุญพา", icon: "🏗️", inVal: "฿" + (siteTotals["บุพา"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["บุพา"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
-                "บ้านคุณบี": { name: "บ้านคุณบี", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณบี"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["บ้านคุณบี"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
-                "บ้านคุณอรรถา": { name: "บ้านคุณอรรถา", icon: "🏡", inVal: "฿" + (siteTotals["บ้านคุณอรรถา"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["บ้านคุณอรรถา"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
-                "ศิริชัย": { name: "ศิริชัย", icon: "🏗️", inVal: "฿" + (siteTotals["ศิริชัย"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["ศิริชัย"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" },
-                "KVG อาคารเก็บสินค้า": { name: "KVG อาคารเก็บสินค้า", icon: "🏬", inVal: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.inVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), stock: "฿" + (siteTotals["KVG อาคารเก็บสินค้า"]?.stockVal || 0).toLocaleString(undefined, {minimumFractionDigits: 0}), usedVal: "฿0" }
-            };
-
-            populateModalMaterials(); 
-            renderAll(); 
-            openProjectDrilldown(currentDrilldownSite);
-        }
-
-        function populateModalMaterials(site = "all") { 
-            const select = document.getElementById("modalItemSelect"); if (!select) return;
-            const currentValue = select.value;
-            let optionsHTML = '<option value="" disabled selected>-- พิมพ์ค้นหาวัสดุ --</option>';
-            inventoryData.forEach(item => { 
-                let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
-                optionsHTML += `<option value="${item.id}">${item.name} (คงเหลือ: ${stock.toLocaleString()} ${item.unit})</option>`; 
-            });
-            select.innerHTML = optionsHTML; 
-            if(currentValue) select.value = currentValue;
-        }
-
-        function toggleTransactionSubmenu() { document.getElementById("transSubmenu").classList.toggle("hidden"); }
-        function toggleReportSubmenu() { document.getElementById("reportSubmenu").classList.toggle("hidden"); }
 
         function renderProjectCardsGrid() {
             const container = document.getElementById("projectCardsContainer"); if (!container) return; container.innerHTML = "";
@@ -1026,33 +957,134 @@
             
             setTimeout(() => {
                 const siteSelect = document.getElementById("modalSiteSelect");
-                populateModalMaterials(siteSelect.value); // ตัดคำยาว
+                populateModalMaterials(siteSelect.value); 
                 
                 const itemSelect = document.getElementById("modalItemSelect");
                 if (itemSelect.options.length > 0) {
                     itemSelect.selectedIndex = 0;
-                    updateLiveStockBadge(); // อัปเดตป้ายเหลืองทันที
+                    updateLiveStockBadge(); 
                 }
             }, 100);
         }
         function closeModal() { document.getElementById("transModal").classList.add("hidden"); document.getElementById("transModal").classList.remove("flex"); }
         function showToast(msg) { const toast = document.getElementById("toast"); document.getElementById("toastMessage").innerText = msg; toast.classList.remove("hidden"); toast.classList.add("flex"); setTimeout(() => { toast.classList.add("hidden"); toast.classList.remove("flex"); }, 3000); }
 
-        // วาดกราฟเบื้องต้น
+        // =====================================
+        // ฟังก์ชันวาดกราฟ (ป้องกันข้อผิดพลาด)
+        // =====================================
         function initCharts() {
-            const ctx1 = document.getElementById('usageTrendChart')?.getContext('2d');
-            if (ctx1) usageTrendChartInstance = new Chart(ctx1, { type: 'line', data: { labels: ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'], datasets: [{ label: 'ปริมาณการเบิก (ชิ้น)', data: [0,0,0,0,0,0,0], borderColor: '#f59e0b', tension: 0.3 }] } });
-            const ctx2 = document.getElementById('categoryPieChart')?.getContext('2d');
-            if (ctx2) categoryPieChartInstance = new Chart(ctx2, { type: 'doughnut', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ data: [1], backgroundColor: ['#cbd5e1'] }] } });
+            try {
+                const ctx1 = document.getElementById('usageTrendChart')?.getContext('2d');
+                if (ctx1 && typeof Chart !== 'undefined') usageTrendChartInstance = new Chart(ctx1, { type: 'line', data: { labels: ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'], datasets: [{ label: 'จำนวนบิลเบิกจ่าย (ครั้ง)', data: [0,0,0,0,0,0,0], borderColor: '#f59e0b', tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false } });
+                
+                const ctx2 = document.getElementById('categoryPieChart')?.getContext('2d');
+                if (ctx2 && typeof Chart !== 'undefined') categoryPieChartInstance = new Chart(ctx2, { type: 'doughnut', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ data: [1], backgroundColor: ['#cbd5e1'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+            } catch(e) { console.error("Chart Init Error:", e); }
         }
 
         function initReportCharts() {
-            const c1 = document.getElementById('disbursementMonthlyChart')?.getContext('2d');
-            if (c1) disbursementMonthlyChartInstance = new Chart(c1, { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'จำนวนชิ้น', data: [0], backgroundColor: '#f59e0b' }] } });
-            const c2 = document.getElementById('receivingMonthlyChart')?.getContext('2d');
-            if (c2) receivingMonthlyChartInstance = new Chart(c2, { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'จำนวนชิ้น', data: [0], backgroundColor: '#10b981' }] } });
-            const c3 = document.getElementById('companyOverviewChart')?.getContext('2d');
-            if (c3) companyOverviewChartInstance = new Chart(c3, { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'ไม่มีข้อมูล', data: [0], backgroundColor: '#3b82f6' }] } });
+            try {
+                const c1 = document.getElementById('disbursementMonthlyChart')?.getContext('2d');
+                if (c1 && typeof Chart !== 'undefined') disbursementMonthlyChartInstance = new Chart(c1, { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'เบิกจ่าย', data: [0], backgroundColor: '#f59e0b' }] }, options: { responsive: true, maintainAspectRatio: false } });
+                
+                const c2 = document.getElementById('receivingMonthlyChart')?.getContext('2d');
+                if (c2 && typeof Chart !== 'undefined') receivingMonthlyChartInstance = new Chart(c2, { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'รับเข้า', data: [0], backgroundColor: '#10b981' }] }, options: { responsive: true, maintainAspectRatio: false } });
+                
+                const c3 = document.getElementById('companyOverviewChart')?.getContext('2d');
+                if (c3 && typeof Chart !== 'undefined') companyOverviewChartInstance = new Chart(c3, { type: 'bar', data: { labels: ['ไม่มีข้อมูล'], datasets: [{ label: 'มูลค่า', data: [0], backgroundColor: '#3b82f6' }] }, options: { responsive: true, maintainAspectRatio: false } });
+            } catch(e) { console.error("Report Chart Init Error:", e); }
+        }
+
+        // ดึงข้อมูลจริงมาใส่กราฟ
+        function updateCharts() {
+            try {
+                if (typeof Chart === 'undefined') return;
+                const site = document.getElementById("siteFilter").value;
+                
+                // กราฟวงกลม
+                let catData = {};
+                inventoryData.forEach(item => {
+                    let stock = site === "all" ? (item.siteStocks["all"] || 0) : (item.siteStocks[site] || 0);
+                    let val = stock * (item.unitPrice || 0);
+                    if (val > 0) catData[item.category] = (catData[item.category] || 0) + val;
+                });
+                
+                if (categoryPieChartInstance) {
+                    let labels = Object.keys(catData);
+                    let values = Object.values(catData);
+                    if (labels.length === 0) { 
+                        labels = ['ไม่มีข้อมูล']; values = [1]; 
+                        categoryPieChartInstance.data.datasets[0].backgroundColor = ['#e2e8f0']; 
+                    } else { 
+                        categoryPieChartInstance.data.datasets[0].backgroundColor = ['#0f172a', '#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6']; 
+                    }
+                    categoryPieChartInstance.data.labels = labels;
+                    categoryPieChartInstance.data.datasets[0].data = values;
+                    categoryPieChartInstance.update();
+                }
+
+                // กราฟ 7 วันล่าสุด
+                if (usageTrendChartInstance) {
+                    let dates = [];
+                    let usageCounts = [];
+                    let today = new Date();
+                    
+                    for (let i = 6; i >= 0; i--) {
+                        let d = new Date(today);
+                        d.setDate(d.getDate() - i);
+                        
+                        // เผื่อ timezone ดึงค่า string ตรงๆ ให้ตรงกับรูปแบบ 2026-08-16
+                        let y = d.getFullYear();
+                        let m = String(d.getMonth() + 1).padStart(2, '0');
+                        let day = String(d.getDate()).padStart(2, '0');
+                        let dateStr = `${y}-${m}-${day}`;
+                        
+                        dates.push(`${d.getDate()}/${d.getMonth()+1}`);
+                        
+                        let count = 0;
+                        transactionsDatabase.forEach(t => {
+                            if (t.date === dateStr && t.mode === 'out' && t.status === 'อนุมัติ') {
+                                if (site === "all" || t.site === site) count += parseFloat(t.qty);
+                            }
+                        });
+                        usageCounts.push(count);
+                    }
+                    usageTrendChartInstance.data.labels = dates;
+                    usageTrendChartInstance.data.datasets[0].data = usageCounts;
+                    usageTrendChartInstance.data.datasets[0].label = 'จำนวนเบิกใช้ (ชิ้น)';
+                    usageTrendChartInstance.update();
+                }
+
+                // อัปเดตกราฟหน้ารายงาน
+                if (disbursementMonthlyChartInstance && transactionsDatabase.length > 0) {
+                    let outData = {};
+                    transactionsDatabase.forEach(t => {
+                        if (t.mode === 'out' && t.status === 'อนุมัติ' && (site === 'all' || t.site === site)) {
+                            let item = inventoryData.find(i => i.id === t.itemId);
+                            let cat = item ? item.category : 'ทั่วไป';
+                            outData[cat] = (outData[cat] || 0) + parseFloat(t.qty);
+                        }
+                    });
+                    disbursementMonthlyChartInstance.data.labels = Object.keys(outData).length ? Object.keys(outData) : ['ไม่มีข้อมูล'];
+                    disbursementMonthlyChartInstance.data.datasets[0].data = Object.keys(outData).length ? Object.values(outData) : [0];
+                    disbursementMonthlyChartInstance.update();
+                }
+
+                if (receivingMonthlyChartInstance && transactionsDatabase.length > 0) {
+                    let inData = {};
+                    transactionsDatabase.forEach(t => {
+                        if (t.mode === 'in' && t.status === 'อนุมัติ' && (site === 'all' || t.site === site)) {
+                            let item = inventoryData.find(i => i.id === t.itemId);
+                            let cat = item ? item.category : 'ทั่วไป';
+                            inData[cat] = (inData[cat] || 0) + parseFloat(t.qty);
+                        }
+                    });
+                    receivingMonthlyChartInstance.data.labels = Object.keys(inData).length ? Object.keys(inData) : ['ไม่มีข้อมูล'];
+                    receivingMonthlyChartInstance.data.datasets[0].data = Object.keys(inData).length ? Object.values(inData) : [0];
+                    receivingMonthlyChartInstance.update();
+                }
+                
+            } catch(e) { console.log('Chart update error:', e); }
         }
     </script>
 </body>
